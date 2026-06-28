@@ -1,5 +1,8 @@
 import { LightningElement, wire } from "lwc";
 import { NavigationMixin } from "lightning/navigation";
+import { refreshApex } from "@salesforce/apex";
+import { createRecord } from "lightning/uiRecordApi";
+import { ShowToastEvent } from "lightning/platformShowToastEvent";
 import getAllCandidates from "@salesforce/apex/PatriotSolutionsHomeController.getAllCandidates";
 import getAllInterviews from "@salesforce/apex/PatriotSolutionsHomeController.getAllInterviews";
 import getDashboardStats from "@salesforce/apex/PatriotSolutionsHomeController.getDashboardStats";
@@ -8,6 +11,7 @@ import getPipelineStages from "@salesforce/apex/PatriotSolutionsHomeController.g
 import getUpcomingInterviews from "@salesforce/apex/PatriotSolutionsHomeController.getUpcomingInterviews";
 import getRecentActivity from "@salesforce/apex/PatriotSolutionsHomeController.getRecentActivity";
 import getOnboardingSummary from "@salesforce/apex/PatriotSolutionsHomeController.getOnboardingSummary";
+import uploadCandidateResume from "@salesforce/apex/PatriotSolutionsHomeController.uploadCandidateResume";
 
 const PIPELINE_CARD_CLASSES = [
   "candidate-card border-outline",
@@ -66,6 +70,19 @@ const NAV_VIEW_IDS = [
   "settings"
 ];
 
+const EMPTY_APPLICATION_FORM = {
+  positionId: "",
+  firstName: "",
+  lastName: "",
+  email: "",
+  source: "Website",
+  requestedCompensation: "",
+  yearsExperience: "",
+  hasClearance: false,
+  hasDegree: false,
+  hasCertification: false
+};
+
 export default class PatriotSolutionsHome extends NavigationMixin(
   LightningElement
 ) {
@@ -91,10 +108,31 @@ export default class PatriotSolutionsHome extends NavigationMixin(
   accessibilityPreferences = { ...DEFAULT_A11Y_PREFERENCES };
   liveRegionMessage = "";
   showShortcutsPanel = false;
+  showApplicationForm = false;
+  applicationForm = { ...EMPTY_APPLICATION_FORM };
+  applicationSubmitting = false;
+  applicationError = "";
+  applicationResumeFile;
+  applicationResumeFileName = "";
+  showAgentChat = false;
+  agentInput = "";
+  agentLoading = false;
+  agentMessages = [
+    {
+      id: "agent-welcome",
+      text: "Hi! I'm the Patriot Solutions assistant. Ask me about candidates, open positions, interview prep, or background checks.",
+      className: "agent-msg agent-msg-ai"
+    }
+  ];
   _keyboardHandler;
   _motionMediaQuery;
   _contrastMediaQuery;
   _colorSchemeMediaQuery;
+  _wiredStatsResult;
+  _wiredPipelineResult;
+  _wiredCandidatesResult;
+  _wiredJobOpeningsResult;
+  _wiredActivityResult;
 
   navItems = [
     {
@@ -157,9 +195,9 @@ export default class PatriotSolutionsHome extends NavigationMixin(
 
   quickActions = [
     {
-      label: "Add Candidate",
-      iconName: "standard:lead",
-      objectApiName: "Lead"
+      label: "Candidate Application",
+      iconName: "standard:job_position",
+      actionName: "apply"
     },
     {
       label: "Manage Contacts",
@@ -174,7 +212,10 @@ export default class PatriotSolutionsHome extends NavigationMixin(
   ];
 
   @wire(getDashboardStats)
-  wiredStats({ data, error }) {
+  wiredStats(result) {
+    this._wiredStatsResult = result;
+    const { data, error } = result;
+
     if (data) {
       this.stats = data;
       this.statsError = undefined;
@@ -191,7 +232,10 @@ export default class PatriotSolutionsHome extends NavigationMixin(
   }
 
   @wire(getPipelineStages)
-  wiredPipeline({ data, error }) {
+  wiredPipeline(result) {
+    this._wiredPipelineResult = result;
+    const { data, error } = result;
+
     if (data) {
       this.pipelineStages = data.map((stage, stageIndex) => ({
         ...this.decoratePipelineStage(stage, stageIndex)
@@ -204,7 +248,10 @@ export default class PatriotSolutionsHome extends NavigationMixin(
   }
 
   @wire(getAllCandidates)
-  wiredCandidates({ data, error }) {
+  wiredCandidates(result) {
+    this._wiredCandidatesResult = result;
+    const { data, error } = result;
+
     if (data) {
       this.candidates = data.map((candidate) => ({
         ...candidate,
@@ -221,11 +268,14 @@ export default class PatriotSolutionsHome extends NavigationMixin(
   }
 
   @wire(getJobOpenings)
-  wiredJobOpenings({ data, error }) {
+  wiredJobOpenings(result) {
+    this._wiredJobOpeningsResult = result;
+    const { data, error } = result;
+
     if (data) {
       this.jobOpenings = data.map((opening) => ({
         ...opening,
-        key: opening.title,
+        key: opening.recordId || opening.title,
         cardClass: "entity-card interactive-card job-opening-card",
         statusClass: "status-badge completed",
         candidateCountLabel: `${opening.candidateCount} candidate${
@@ -251,21 +301,25 @@ export default class PatriotSolutionsHome extends NavigationMixin(
   }
 
   decoratePipelineStage(stage, stageIndex) {
+    const isRejectedStage =
+      (stage.name || stage.label || "").toLowerCase().includes("rejected");
     const stageColorIndex =
       stage.stageIndex === undefined || stage.stageIndex === null
         ? stageIndex
         : stage.stageIndex;
-    const cardClass =
-      PIPELINE_CARD_CLASSES[stageColorIndex % PIPELINE_CARD_CLASSES.length];
+    const cardClass = isRejectedStage
+      ? "candidate-card border-rejected"
+      : PIPELINE_CARD_CLASSES[stageColorIndex % PIPELINE_CARD_CLASSES.length];
     const candidates = (stage.candidates || []).map(
       (candidate, candidateIndex) => ({
         ...candidate,
         key: candidate.recordId,
         cardClass,
-        badgeClass:
-          PIPELINE_BADGE_CLASSES[
-            candidateIndex % PIPELINE_BADGE_CLASSES.length
-          ],
+        badgeClass: isRejectedStage
+          ? "badge red"
+          : PIPELINE_BADGE_CLASSES[
+              candidateIndex % PIPELINE_BADGE_CLASSES.length
+            ],
         showStatus: candidateIndex === 0
       })
     );
@@ -273,7 +327,9 @@ export default class PatriotSolutionsHome extends NavigationMixin(
     return {
       ...stage,
       key: stage.name || stage.label,
-      stageClass: `kanban-column stage-${stageColorIndex % PIPELINE_CARD_CLASSES.length}`,
+      stageClass: isRejectedStage
+        ? "kanban-column stage-rejected"
+        : `kanban-column stage-${stageColorIndex % PIPELINE_CARD_CLASSES.length}`,
       hasCandidates: candidates.length > 0,
       candidates
     };
@@ -299,7 +355,10 @@ export default class PatriotSolutionsHome extends NavigationMixin(
   }
 
   @wire(getRecentActivity)
-  wiredActivity({ data, error }) {
+  wiredActivity(result) {
+    this._wiredActivityResult = result;
+    const { data, error } = result;
+
     if (data) {
       this.recentActivity = data.map((activity) => ({
         ...activity,
@@ -363,7 +422,7 @@ export default class PatriotSolutionsHome extends NavigationMixin(
       },
       {
         key: "onboarding",
-        label: "Contacts in Pipeline",
+        label: "Employees Onboarding",
         value: String(this.stats.contactsInPipeline),
         iconName: "standard:employee"
       }
@@ -492,6 +551,44 @@ export default class PatriotSolutionsHome extends NavigationMixin(
 
   get hasJobOpenings() {
     return this.jobOpenings.length > 0;
+  }
+
+  get positionOptions() {
+    return this.jobOpenings
+      .filter((opening) => opening.recordId)
+      .map((opening) => ({
+        label: opening.title,
+        value: opening.recordId
+      }));
+  }
+
+  get hasPositionOptions() {
+    return this.positionOptions.length > 0;
+  }
+
+  get sourceOptions() {
+    return [
+      { label: "Website", value: "Website" },
+      { label: "LinkedIn", value: "LinkedIn" },
+      { label: "Indeed", value: "Indeed" },
+      { label: "Referral", value: "Referral" },
+      { label: "Campus", value: "Campus" },
+      { label: "Passive Outreach", value: "Passive Outreach" }
+    ];
+  }
+
+  get applicationSubmitLabel() {
+    return this.applicationSubmitting ? "Submitting..." : "Submit Application";
+  }
+
+  get isApplicationSubmitDisabled() {
+    return (
+      this.applicationSubmitting ||
+      !this.hasPositionOptions ||
+      !this.applicationForm.positionId ||
+      !this.applicationForm.lastName ||
+      !this.applicationForm.email
+    );
   }
 
   get hasActivity() {
@@ -758,11 +855,22 @@ export default class PatriotSolutionsHome extends NavigationMixin(
   handleKeyboardShortcuts(event) {
     const target = event.target;
     const tagName = target.tagName?.toLowerCase();
+    const path = typeof event.composedPath === "function" ? event.composedPath() : [];
     const isEditable =
       tagName === "input" ||
       tagName === "textarea" ||
       tagName === "select" ||
-      target.isContentEditable;
+      target.isContentEditable ||
+      path.some((node) => {
+        const nodeTag = node.tagName?.toLowerCase();
+        return (
+          nodeTag === "lightning-input" ||
+          nodeTag === "lightning-combobox" ||
+          nodeTag === "textarea" ||
+          nodeTag === "input" ||
+          node?.classList?.contains("application-modal")
+        );
+      });
 
     if (event.key === "Escape" && this.showShortcutsPanel) {
       this.showShortcutsPanel = false;
@@ -993,15 +1101,196 @@ export default class PatriotSolutionsHome extends NavigationMixin(
   }
 
   handleNewCandidate() {
-    this.navigateToNewRecord("Lead");
+    this.openApplicationForm();
   }
 
   handleQuickAction(event) {
+    const actionName = event.currentTarget.dataset.action;
     const objectApiName = event.currentTarget.dataset.object;
+
+    if (actionName === "apply") {
+      this.openApplicationForm();
+      return;
+    }
 
     if (objectApiName) {
       this.navigateToNewRecord(objectApiName);
     }
+  }
+
+  openApplicationForm(positionId) {
+    this.applicationForm = {
+      ...EMPTY_APPLICATION_FORM,
+      positionId:
+        positionId ||
+        this.applicationForm.positionId ||
+        (this.positionOptions[0] ? this.positionOptions[0].value : "")
+    };
+    this.applicationError = "";
+    this.applicationResumeFile = undefined;
+    this.applicationResumeFileName = "";
+    this.showApplicationForm = true;
+    this.announceLiveMessage("Candidate application form opened.");
+  }
+
+  closeApplicationForm() {
+    if (this.applicationSubmitting) {
+      return;
+    }
+
+    this.showApplicationForm = false;
+    this.applicationError = "";
+    this.announceLiveMessage("Candidate application form closed.");
+  }
+
+  handleApplicationFieldChange(event) {
+    const field = event.target.dataset.field;
+
+    if (!field) {
+      return;
+    }
+
+    const value =
+      event.target.type === "checkbox" ? event.target.checked : event.detail.value;
+
+    this.applicationForm = {
+      ...this.applicationForm,
+      [field]: value
+    };
+  }
+
+  handleResumeFileChange(event) {
+    const file = event.target.files && event.target.files[0];
+
+    if (!file) {
+      this.applicationResumeFile = undefined;
+      this.applicationResumeFileName = "";
+      return;
+    }
+
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      this.applicationError = "Resume upload must be a PDF file.";
+      this.applicationResumeFile = undefined;
+      this.applicationResumeFileName = "";
+      return;
+    }
+
+    this.applicationError = "";
+    this.applicationResumeFile = file;
+    this.applicationResumeFileName = file.name;
+  }
+
+  async handleApplicationSubmit() {
+    if (this.isApplicationSubmitDisabled) {
+      return;
+    }
+
+    this.applicationSubmitting = true;
+    this.applicationError = "";
+
+    try {
+      const contact = await createRecord({
+        apiName: "Contact",
+        fields: {
+          FirstName: this.applicationForm.firstName,
+          LastName: this.applicationForm.lastName,
+          Email: this.applicationForm.email,
+          Source__c: this.applicationForm.source
+        }
+      });
+
+      if (this.applicationResumeFile) {
+        const base64Data = await this.readFileAsBase64(this.applicationResumeFile);
+        await uploadCandidateResume({
+          contactId: contact.id,
+          fileName: this.applicationResumeFile.name,
+          base64Data
+        });
+      }
+
+      await createRecord({
+        apiName: "Job_Application__c",
+        fields: {
+          Candidate__c: contact.id,
+          Position__c: this.applicationForm.positionId,
+          Stage__c: "Applied",
+          Applied_Date__c: new Date().toISOString().slice(0, 10),
+          Years_of_Experience__c: Number(
+            this.applicationForm.yearsExperience || 0
+          ),
+          Compensation_Expectation__c: Number(
+            this.applicationForm.requestedCompensation || 0
+          ),
+          Has_Security_Clearance__c: this.applicationForm.hasClearance,
+          Has_Required_Degree__c: this.applicationForm.hasDegree,
+          Has_Required_Certification__c:
+            this.applicationForm.hasCertification
+        }
+      });
+
+      this.dispatchEvent(
+        new ShowToastEvent({
+          title: "Application submitted",
+          message: "The candidate was added to the hiring pipeline.",
+          variant: "success"
+        })
+      );
+      this.showApplicationForm = false;
+      this.applicationForm = { ...EMPTY_APPLICATION_FORM };
+      this.applicationResumeFile = undefined;
+      this.applicationResumeFileName = "";
+      await this.refreshDashboardData();
+      this.setActiveView("hiringPipeline");
+    } catch (error) {
+      this.applicationError = this.reduceError(error);
+      this.dispatchEvent(
+        new ShowToastEvent({
+          title: "Application not submitted",
+          message: this.applicationError,
+          variant: "error"
+        })
+      );
+    } finally {
+      this.applicationSubmitting = false;
+    }
+  }
+
+  readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result || "";
+        resolve(result.toString().split(",").pop());
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async refreshDashboardData() {
+    await Promise.all(
+      [
+        this._wiredStatsResult,
+        this._wiredPipelineResult,
+        this._wiredCandidatesResult,
+        this._wiredJobOpeningsResult,
+        this._wiredActivityResult
+      ]
+        .filter(Boolean)
+        .map((result) => refreshApex(result))
+    );
+  }
+
+  reduceError(error) {
+    if (Array.isArray(error?.body)) {
+      return error.body.map((item) => item.message).join(", ");
+    }
+
+    return (
+      error?.body?.message ||
+      error?.message ||
+      "Something went wrong while submitting the application."
+    );
   }
 
   handleViewAnalytics() {
@@ -1046,7 +1335,7 @@ export default class PatriotSolutionsHome extends NavigationMixin(
     const recordId = event.currentTarget.dataset.id;
 
     if (recordId) {
-      this.navigateToRecord("Lead", recordId);
+      this.navigateToRecord("Job_Application__c", recordId);
     }
   }
 
@@ -1056,6 +1345,148 @@ export default class PatriotSolutionsHome extends NavigationMixin(
     if (recordId) {
       this.navigateToRecord("Event", recordId);
     }
+  }
+
+  handleToggleAgent() {
+    this.showAgentChat = !this.showAgentChat;
+
+    if (this.showAgentChat) {
+      this.announceLiveMessage("Patriot Solutions assistant opened.");
+    } else {
+      this.announceLiveMessage("Patriot Solutions assistant closed.");
+    }
+  }
+
+  handleAgentInput(event) {
+    this.agentInput = event.target.value || "";
+  }
+
+  handleAgentKeydown(event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      this.handleAgentSend();
+    }
+  }
+
+  handleQuickPrompt(event) {
+    this.agentInput = event.currentTarget.dataset.prompt || "";
+    this.handleAgentSend();
+  }
+
+  handleAgentSend() {
+    const userText = this.agentInput.trim();
+
+    if (!userText || this.agentLoading) {
+      return;
+    }
+
+    const timestamp = Date.now();
+    this.agentMessages = [
+      ...this.agentMessages,
+      {
+        id: `agent-user-${timestamp}`,
+        text: userText,
+        className: "agent-msg agent-msg-user"
+      }
+    ];
+    this.agentInput = "";
+    this.agentLoading = true;
+    this.announceLiveMessage("Patriot Solutions assistant is thinking.");
+
+    // eslint-disable-next-line @lwc/lwc/no-async-operation
+    window.setTimeout(() => {
+      this.agentMessages = [
+        ...this.agentMessages,
+        {
+          id: `agent-ai-${timestamp}`,
+          text: this.getHardcodedResponse(userText),
+          className: "agent-msg agent-msg-ai"
+        }
+      ];
+      this.agentLoading = false;
+      this.announceLiveMessage("Patriot Solutions assistant response added.");
+    }, 900);
+  }
+
+  getHardcodedResponse(userText) {
+    const text = userText.toLowerCase();
+
+    if (text.includes("casey")) {
+      return `Casey Thompson - HR Analyst | Stage: Recruiter Screen
+Profile: 1 yr HR operations - Degree complete - Campus source
+Strengths: Early-career HR profile, strong administrative fit, high coachability
+Probe: Practical HR scenarios, communication under pressure, comfort with compliance documentation
+Suggested questions:
+1. Tell me about a time you handled sensitive employee or student information.
+2. How would you prioritize multiple onboarding tasks with the same deadline?
+3. What parts of HR operations are you most excited to grow into?`;
+    }
+
+    if (text.includes("sam")) {
+      return `Sam Patel - Software Engineer | Stage: Offer Extended
+Profile: 8 yrs engineering - Active security clearance - Degree + certification
+Strengths: Senior technical depth, clears all knockout requirements, strong offer-stage candidate
+Probe: Compensation alignment, start date, team fit, long-term retention
+Suggested next steps:
+1. Confirm offer acceptance timeline.
+2. Validate start-date availability and clearance transfer details.
+3. Prepare onboarding handoff if the offer is accepted.`;
+    }
+
+    if (text.includes("alex") || text.includes("interview prep")) {
+      return `Alex Rivera - Software Engineer | Stage: Interview Loop
+Profile: 6 yrs full-stack - Active security clearance - CS degree
+Strengths: Deep technical background, already cleared, proven full-stack delivery
+Probe: Leadership/mentorship, system design at scale
+Suggested questions:
+1. Walk me through a distributed system you architected end-to-end. What were the tradeoffs?
+2. How have you handled security and compliance requirements in past projects?
+3. Where do you see yourself in 3 years, and what team do you want to grow into?`;
+    }
+
+    if (text.includes("open position") || text.includes("positions")) {
+      return `Patriot Solutions has 3 open positions:
+1. Software Engineer - Engineering - Requires active security clearance + degree
+2. HR Analyst - HR - Requires degree
+3. Project Manager - Operations - Requires PM certification + 5 yrs experience`;
+    }
+
+    if (text.includes("pipeline") || text.includes("candidate")) {
+      return `Current pipeline (10 active):
+- Resume Review: 1
+- Recruiter Screen: 1 - Casey Thompson
+- HM Interview: 1 - Taylor Brown
+- Interview Loop: 2 - Alex Rivera, Drew Martinez
+- Background Check: 1 - Riley Johnson
+- Offer Extended: 1 - Sam Patel
+- Hired: 1 - Quinn Anderson
+Rejected (auto-knockout): 3 - Jordan Lee, Morgan Davis, Jamie Wilson`;
+    }
+
+    if (text.includes("background")) {
+      return `Riley Johnson - Background Check (Software Engineer)
+Verification checklist:
+- Employment History - pending
+- Degree - pending
+- Identity - pending
+- Certifications - pending
+Compliance gate: candidate cannot move to Hired until all four are verified.`;
+    }
+
+    if (
+      text.includes("rejection") ||
+      text.includes("jordan") ||
+      text.includes("reject")
+    ) {
+      return `Subject: Your application to Software Engineer at Patriot Solutions
+
+Dear Jordan,
+Thank you for your interest in the Software Engineer role at Patriot Solutions. After careful review, we're unable to move forward, as the position requires an active security clearance that your application did not meet.
+We appreciate the time you invested and encourage you to apply for future roles that match your background. We wish you all the best.
+- Patriot Solutions Talent Team`;
+    }
+
+    return "I can help with interview prep for Alex Rivera, Casey Thompson, or Sam Patel, plus open positions, candidate pipeline, background check status, and rejection emails. Try one of the quick prompts below.";
   }
 
   navigateToObjectHome(objectApiName) {

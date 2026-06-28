@@ -3,24 +3,39 @@ public with sharing class PatriotSolutionsHomeController {
   private static final Integer ALL_CANDIDATE_LIMIT = 50;
   private static final Integer DASHBOARD_INTERVIEW_LIMIT = 5;
   private static final Integer ALL_INTERVIEW_LIMIT = 25;
-  private static final Integer JOB_OPENING_SOURCE_LIMIT = 50;
   private static final Integer JOB_OPENING_DISPLAY_LIMIT = 12;
-  private static final String GENERAL_RECRUITING_TITLE = 'General Recruiting';
+  private static final List<String> APPLICATION_STAGE_ORDER = new List<String>{
+    'Applied',
+    'Resume Review',
+    'Recruiter Screen',
+    'HM Interview',
+    'Interview Loop',
+    'Background Check',
+    'Offer Extended',
+    'Hired',
+    'Rejected'
+  };
 
   @AuraEnabled(cacheable=true)
   public static DashboardStats getDashboardStats() {
     Integer activeCandidates = [
       SELECT COUNT()
-      FROM Lead
-      WHERE IsConverted = FALSE
+      FROM Job_Application__c
     ];
-    Integer contactsInPipeline = [SELECT COUNT() FROM Contact];
-    Integer convertedThisMonth = [
+    Integer onboardingCount = [
       SELECT COUNT()
-      FROM Lead
-      WHERE
-        IsConverted = TRUE
-        AND CALENDAR_MONTH(ConvertedDate) = :Date.today().month()
+      FROM Onboarding_Task__c
+      WHERE Status__c != 'Complete'
+    ];
+    Integer hiredCount = [
+      SELECT COUNT()
+      FROM Job_Application__c
+      WHERE Stage__c = 'Hired'
+    ];
+    Integer openPositions = [
+      SELECT COUNT()
+      FROM Position__c
+      WHERE Status__c = 'Open'
     ];
     Integer upcomingInterviews = [
       SELECT COUNT()
@@ -30,9 +45,9 @@ public with sharing class PatriotSolutionsHomeController {
 
     return new DashboardStats(
       activeCandidates,
-      contactsInPipeline,
-      convertedThisMonth,
-      12,
+      onboardingCount,
+      hiredCount,
+      openPositions,
       upcomingInterviews
     );
   }
@@ -52,14 +67,19 @@ public with sharing class PatriotSolutionsHomeController {
   ) {
     List<CandidateSummary> candidates = new List<CandidateSummary>();
 
-    for (Lead leadRecord : [
-      SELECT Id, Name, Company, Status, Email, CreatedDate
-      FROM Lead
-      WHERE IsConverted = FALSE
+    for (Job_Application__c application : [
+      SELECT
+        Id,
+        Stage__c,
+        CreatedDate,
+        Candidate__r.Name,
+        Candidate__r.Email,
+        Position__r.Name
+      FROM Job_Application__c
       ORDER BY CreatedDate DESC
       LIMIT :rowLimit
     ]) {
-      candidates.add(buildCandidateSummary(leadRecord));
+      candidates.add(buildCandidateSummary(application));
     }
 
     return candidates;
@@ -69,16 +89,15 @@ public with sharing class PatriotSolutionsHomeController {
   public static List<PipelineStage> getPipelineStages() {
     Map<String, List<PipelineCandidate>> candidatesByStatus = new Map<String, List<PipelineCandidate>>();
 
-    for (Lead leadRecord : [
-      SELECT Id, Name, Company, Status
-      FROM Lead
-      WHERE IsConverted = FALSE
+    for (Job_Application__c application : [
+      SELECT Id, Stage__c, Candidate__r.Name, Position__r.Name
+      FROM Job_Application__c
       ORDER BY CreatedDate DESC
       LIMIT 50
     ]) {
-      String statusLabel = String.isBlank(leadRecord.Status)
-        ? 'Unassigned'
-        : leadRecord.Status;
+      String statusLabel = String.isBlank(application.Stage__c)
+        ? 'Applied'
+        : application.Stage__c;
 
       if (!candidatesByStatus.containsKey(statusLabel)) {
         candidatesByStatus.put(statusLabel, new List<PipelineCandidate>());
@@ -87,9 +106,13 @@ public with sharing class PatriotSolutionsHomeController {
       candidatesByStatus.get(statusLabel)
         .add(
           new PipelineCandidate(
-            leadRecord.Id,
-            leadRecord.Name,
-            leadRecord.Company,
+            application.Id,
+            application.Candidate__r != null
+              ? application.Candidate__r.Name
+              : 'Candidate',
+            application.Position__r != null
+              ? application.Position__r.Name
+              : 'Open Role',
             statusLabel
           )
         );
@@ -161,40 +184,35 @@ public with sharing class PatriotSolutionsHomeController {
 
   @AuraEnabled(cacheable=true)
   public static List<JobOpeningSummary> getJobOpenings() {
-    Map<String, Integer> candidateCountsByTitle = new Map<String, Integer>();
+    Map<Id, Integer> candidateCountsByPosition = new Map<Id, Integer>();
 
-    for (Lead leadRecord : [
-      SELECT Company
-      FROM Lead
-      WHERE IsConverted = FALSE
-      ORDER BY CreatedDate DESC
-      LIMIT :JOB_OPENING_SOURCE_LIMIT
+    for (AggregateResult result : [
+      SELECT Position__c positionId, COUNT(Id) candidateCount
+      FROM Job_Application__c
+      WHERE Position__c != NULL
+      GROUP BY Position__c
     ]) {
-      String title = String.isBlank(leadRecord.Company)
-        ? GENERAL_RECRUITING_TITLE
-        : leadRecord.Company;
-
-      Integer currentCount = candidateCountsByTitle.containsKey(title)
-        ? candidateCountsByTitle.get(title)
-        : 0;
-      candidateCountsByTitle.put(title, currentCount + 1);
+      candidateCountsByPosition.put(
+        (Id) result.get('positionId'),
+        (Integer) result.get('candidateCount')
+      );
     }
 
-    List<String> titles = new List<String>();
-    titles.addAll(candidateCountsByTitle.keySet());
-    titles.sort();
-
     List<JobOpeningSummary> openings = new List<JobOpeningSummary>();
-    for (String title : titles) {
-      if (openings.size() >= JOB_OPENING_DISPLAY_LIMIT) {
-        break;
-      }
-
+    for (Position__c position : [
+      SELECT Id, Name, Status__c
+      FROM Position__c
+      ORDER BY CreatedDate DESC
+      LIMIT :JOB_OPENING_DISPLAY_LIMIT
+    ]) {
       openings.add(
         new JobOpeningSummary(
-          title,
-          candidateCountsByTitle.get(title),
-          'Active'
+          position.Id,
+          position.Name,
+          candidateCountsByPosition.containsKey(position.Id)
+            ? candidateCountsByPosition.get(position.Id)
+            : 0,
+          String.isBlank(position.Status__c) ? 'Open' : position.Status__c
         )
       );
     }
@@ -212,21 +230,26 @@ public with sharing class PatriotSolutionsHomeController {
     };
     Integer dotIndex = 0;
 
-    for (Lead leadRecord : [
-      SELECT Name, Company, CreatedDate
-      FROM Lead
-      WHERE IsConverted = FALSE
+    for (Job_Application__c application : [
+      SELECT Candidate__r.Name, Position__r.Name, CreatedDate
+      FROM Job_Application__c
       ORDER BY CreatedDate DESC
       LIMIT 5
     ]) {
+      String candidateName = application.Candidate__r != null
+        ? application.Candidate__r.Name
+        : 'Candidate';
+      String positionName = application.Position__r != null
+        ? application.Position__r.Name
+        : 'open role';
+
       activityItems.add(
         new ActivityItem(
           'New candidate: ' +
-            leadRecord.Name +
-            (String.isBlank(leadRecord.Company)
-              ? ''
-              : ' at ' + leadRecord.Company),
-          formatRelativeTime(leadRecord.CreatedDate),
+            candidateName +
+            ' for ' +
+            positionName,
+          formatRelativeTime(application.CreatedDate),
           dotIndex == 0 ? 'activity-item' : 'activity-item indented',
           dotClasses[Math.mod(dotIndex, dotClasses.size())]
         )
@@ -239,10 +262,9 @@ public with sharing class PatriotSolutionsHomeController {
 
   @AuraEnabled(cacheable=true)
   public static OnboardingSummary getOnboardingSummary() {
-    List<Task> tasks = [
-      SELECT Id, Subject, Status, IsClosed
-      FROM Task
-      WHERE IsClosed = FALSE
+    List<Onboarding_Task__c> tasks = [
+      SELECT Id, Name, Status__c
+      FROM Onboarding_Task__c
       ORDER BY CreatedDate DESC
       LIMIT 6
     ];
@@ -261,8 +283,8 @@ public with sharing class PatriotSolutionsHomeController {
 
     Integer completedTasks = [
       SELECT COUNT()
-      FROM Task
-      WHERE IsClosed = TRUE
+      FROM Onboarding_Task__c
+      WHERE Status__c = 'Complete'
     ];
     Integer totalTasks = completedTasks + tasks.size();
     Integer progressPercent = totalTasks == 0
@@ -270,11 +292,11 @@ public with sharing class PatriotSolutionsHomeController {
       : (completedTasks * 100) / totalTasks;
 
     List<OnboardingTaskItem> taskItems = new List<OnboardingTaskItem>();
-    for (Task taskRecord : tasks) {
+    for (Onboarding_Task__c taskRecord : tasks) {
       taskItems.add(
         new OnboardingTaskItem(
-          taskRecord.Subject,
-          taskRecord.IsClosed || taskRecord.Status == 'Completed'
+          taskRecord.Name,
+          taskRecord.Status__c == 'Complete'
         )
       );
     }
@@ -282,14 +304,45 @@ public with sharing class PatriotSolutionsHomeController {
     return new OnboardingSummary(progressPercent, taskItems);
   }
 
-  private static CandidateSummary buildCandidateSummary(Lead leadRecord) {
+  @AuraEnabled
+  public static Id uploadCandidateResume(
+    Id contactId,
+    String fileName,
+    String base64Data
+  ) {
+    if (contactId == null) {
+      throw new AuraHandledException('A contact is required for resume upload.');
+    }
+
+    if (String.isBlank(fileName) || String.isBlank(base64Data)) {
+      throw new AuraHandledException('A PDF resume file is required.');
+    }
+
+    String title = fileName.toLowerCase().endsWith('.pdf')
+      ? fileName.substring(0, fileName.length() - 4)
+      : fileName;
+
+    ContentVersion resume = new ContentVersion(
+      Title = title,
+      PathOnClient = fileName,
+      VersionData = EncodingUtil.base64Decode(base64Data),
+      FirstPublishLocationId = contactId
+    );
+    insert resume;
+
+    return resume.Id;
+  }
+
+  private static CandidateSummary buildCandidateSummary(
+    Job_Application__c application
+  ) {
     return new CandidateSummary(
-      leadRecord.Id,
-      leadRecord.Name,
-      leadRecord.Company,
-      leadRecord.Status,
-      leadRecord.Email,
-      leadRecord.CreatedDate
+      application.Id,
+      application.Candidate__r != null ? application.Candidate__r.Name : '',
+      application.Position__r != null ? application.Position__r.Name : '',
+      application.Stage__c,
+      application.Candidate__r != null ? application.Candidate__r.Email : '',
+      application.CreatedDate
     );
   }
 
@@ -299,14 +352,9 @@ public with sharing class PatriotSolutionsHomeController {
     List<String> orderedStatuses = new List<String>();
     Set<String> addedStatuses = new Set<String>();
 
-    for (LeadStatus statusRecord : [
-      SELECT MasterLabel
-      FROM LeadStatus
-      WHERE IsConverted = FALSE
-      ORDER BY SortOrder
-    ]) {
-      orderedStatuses.add(statusRecord.MasterLabel);
-      addedStatuses.add(statusRecord.MasterLabel);
+    for (String stageName : APPLICATION_STAGE_ORDER) {
+      orderedStatuses.add(stageName);
+      addedStatuses.add(stageName);
     }
 
     List<String> additionalStatuses = new List<String>();
@@ -421,6 +469,8 @@ public with sharing class PatriotSolutionsHomeController {
 
   public class JobOpeningSummary {
     @AuraEnabled
+    public Id recordId { get; private set; }
+    @AuraEnabled
     public String title { get; private set; }
     @AuraEnabled
     public Integer candidateCount { get; private set; }
@@ -428,10 +478,12 @@ public with sharing class PatriotSolutionsHomeController {
     public String status { get; private set; }
 
     public JobOpeningSummary(
+      Id recordId,
       String title,
       Integer candidateCount,
       String status
     ) {
+      this.recordId = recordId;
       this.title = title;
       this.candidateCount = candidateCount;
       this.status = status;

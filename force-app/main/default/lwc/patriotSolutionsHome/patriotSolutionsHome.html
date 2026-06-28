@@ -78,7 +78,7 @@
             size="small"
             alternative-text="Add"
           ></lightning-icon>
-          Add Candidate
+          Candidate Application
         </button>
       </div>
     </aside>
@@ -321,6 +321,7 @@
                         <template for:each={quickActions} for:item="action">
                           <button
                             class="quick-action"
+                            data-action={action.actionName}
                             data-object={action.objectApiName}
                             key={action.label}
                             type="button"
@@ -474,7 +475,7 @@
                       type="button"
                       onclick={handleNewCandidate}
                     >
-                      Add Candidate
+                      Candidate Application
                     </button>
                   </div>
 
@@ -595,7 +596,7 @@
                       type="button"
                       onclick={handleNewCandidate}
                     >
-                      Add Candidate
+                      Candidate Application
                     </button>
                   </div>
 
@@ -1527,5 +1528,271 @@
         </nav>
       </footer>
     </div>
+  </div>
+
+  <template lwc:if={showApplicationForm}>
+    <section
+      class="application-modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Candidate application"
+    >
+      <div class="application-modal slds-card">
+        <header class="application-modal-header">
+          <div>
+            <h2>Candidate Application</h2>
+            <p>Create a contact and submit a job application.</p>
+          </div>
+          <button
+            class="agent-close-btn modal-close-btn"
+            type="button"
+            onclick={closeApplicationForm}
+            aria-label="Close application form"
+          >
+            x
+          </button>
+        </header>
+
+        <div class="application-modal-body">
+          <template lwc:if={applicationError}>
+            <p class="form-error">{applicationError}</p>
+          </template>
+
+          <template lwc:if={hasPositionOptions}>
+            <lightning-combobox
+              label="Position"
+              value={applicationForm.positionId}
+              options={positionOptions}
+              data-field="positionId"
+              onchange={handleApplicationFieldChange}
+              required
+            ></lightning-combobox>
+
+            <div class="form-grid two-column">
+              <lightning-input
+                label="First Name"
+                value={applicationForm.firstName}
+                data-field="firstName"
+                onchange={handleApplicationFieldChange}
+              ></lightning-input>
+              <lightning-input
+                label="Last Name"
+                value={applicationForm.lastName}
+                data-field="lastName"
+                onchange={handleApplicationFieldChange}
+                required
+              ></lightning-input>
+            </div>
+
+            <div class="form-grid two-column">
+              <lightning-input
+                type="email"
+                label="Email"
+                value={applicationForm.email}
+                data-field="email"
+                onchange={handleApplicationFieldChange}
+                required
+              ></lightning-input>
+              <lightning-combobox
+                label="Source"
+                value={applicationForm.source}
+                options={sourceOptions}
+                data-field="source"
+                onchange={handleApplicationFieldChange}
+              ></lightning-combobox>
+            </div>
+
+            <div class="form-grid qualification-grid">
+              <lightning-input
+                type="number"
+                label="Years of Experience"
+                min="0"
+                value={applicationForm.yearsExperience}
+                data-field="yearsExperience"
+                onchange={handleApplicationFieldChange}
+              ></lightning-input>
+              <lightning-input
+                type="number"
+                label="Requested Compensation"
+                min="0"
+                formatter="currency"
+                value={applicationForm.requestedCompensation}
+                data-field="requestedCompensation"
+                onchange={handleApplicationFieldChange}
+              ></lightning-input>
+              <lightning-input
+                type="checkbox"
+                label="Has Security Clearance"
+                checked={applicationForm.hasClearance}
+                data-field="hasClearance"
+                onchange={handleApplicationFieldChange}
+              ></lightning-input>
+              <lightning-input
+                type="checkbox"
+                label="Has Required Degree"
+                checked={applicationForm.hasDegree}
+                data-field="hasDegree"
+                onchange={handleApplicationFieldChange}
+              ></lightning-input>
+              <lightning-input
+                type="checkbox"
+                label="Has Required Certification"
+                checked={applicationForm.hasCertification}
+                data-field="hasCertification"
+                onchange={handleApplicationFieldChange}
+              ></lightning-input>
+            </div>
+
+            <div class="resume-upload-row">
+              <lightning-input
+                type="file"
+                label="Upload Resume PDF"
+                accept=".pdf,application/pdf"
+                onchange={handleResumeFileChange}
+              ></lightning-input>
+              <template lwc:if={applicationResumeFileName}>
+                <p class="file-selected-label">
+                  Selected: {applicationResumeFileName}
+                </p>
+              </template>
+            </div>
+          </template>
+          <template lwc:else>
+            <p class="empty-state">
+              Create an open position before accepting candidate applications.
+            </p>
+          </template>
+        </div>
+
+        <footer class="application-modal-footer">
+          <button
+            class="secondary-pill"
+            type="button"
+            onclick={closeApplicationForm}
+            disabled={applicationSubmitting}
+          >
+            Cancel
+          </button>
+          <button
+            class="primary-pill"
+            type="button"
+            onclick={handleApplicationSubmit}
+            disabled={isApplicationSubmitDisabled}
+          >
+            {applicationSubmitLabel}
+          </button>
+        </footer>
+      </div>
+    </section>
+  </template>
+
+  <div class="agent-bubble-container">
+    <template lwc:if={showAgentChat}>
+      <section
+        class="agent-chat-panel"
+        role="dialog"
+        aria-label="Agentforce HR Assistant"
+      >
+        <header class="agent-chat-header">
+          <div class="agent-chat-header-left">
+            <lightning-icon
+              icon-name="utility:einstein"
+              size="small"
+              alternative-text="Agentforce"
+              class="agent-einstein-icon"
+            ></lightning-icon>
+            <span>Patriot Solutions AI Assistant</span>
+          </div>
+          <button
+            class="agent-close-btn"
+            type="button"
+            onclick={handleToggleAgent}
+            aria-label="Close assistant"
+          >
+            x
+          </button>
+        </header>
+
+        <div class="agent-chat-messages" aria-live="polite">
+          <template for:each={agentMessages} for:item="msg">
+            <div key={msg.id} class={msg.className}>
+              <p>{msg.text}</p>
+            </div>
+          </template>
+          <template lwc:if={agentLoading}>
+            <div class="agent-msg agent-msg-ai agent-msg-loading">
+              <span class="agent-loading-label">Thinking</span>
+              <span class="agent-dots" aria-hidden="true">
+                <span></span>
+                <span></span>
+                <span></span>
+              </span>
+            </div>
+          </template>
+        </div>
+
+        <div class="agent-chat-input-row">
+          <input
+            type="text"
+            class="agent-input"
+            placeholder="Ask about candidates, pipeline, interviews..."
+            value={agentInput}
+            oninput={handleAgentInput}
+            onkeydown={handleAgentKeydown}
+            aria-label="Ask the HR assistant"
+          />
+          <button
+            class="agent-send-btn primary-pill"
+            type="button"
+            onclick={handleAgentSend}
+            disabled={agentLoading}
+          >
+            Send
+          </button>
+        </div>
+
+        <div class="agent-quick-prompts" aria-label="Suggested prompts">
+          <button
+            class="agent-quick-btn"
+            type="button"
+            data-prompt="Give me an interview prep summary for Alex Rivera"
+            onclick={handleQuickPrompt}
+          >
+            Interview prep: Alex Rivera
+          </button>
+          <button
+            class="agent-quick-btn"
+            type="button"
+            data-prompt="What are the current open positions at Patriot Solutions?"
+            onclick={handleQuickPrompt}
+          >
+            Open positions
+          </button>
+          <button
+            class="agent-quick-btn"
+            type="button"
+            data-prompt="Who is currently in the background check stage?"
+            onclick={handleQuickPrompt}
+          >
+            Background check status
+          </button>
+        </div>
+      </section>
+    </template>
+
+    <button
+      class="agent-fab"
+      type="button"
+      onclick={handleToggleAgent}
+      aria-label="Open Agentforce HR Assistant"
+    >
+      <lightning-icon
+        icon-name="utility:einstein"
+        size="small"
+        alternative-text="AI"
+        class="agent-fab-icon"
+      ></lightning-icon>
+      <span>Ask AI</span>
+    </button>
   </div>
 </template>
