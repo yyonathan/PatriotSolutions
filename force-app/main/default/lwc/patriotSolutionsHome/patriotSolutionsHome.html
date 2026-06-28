@@ -1,294 +1,1531 @@
 <template>
-    <div class="dashboard-shell">
-        <aside class="sidebar">
-            <div class="sidebar-heading">
-                <h2>Recruitment</h2>
-                <p>Management</p>
+  <template lwc:if={showSkipLink}>
+    <a class="skip-link" href="#main-content" onclick={handleSkipToMain}
+      >Skip to main content</a
+    >
+  </template>
+
+  <div class="sr-live-region" aria-live="polite" aria-atomic="true">
+    {liveRegionMessage}
+  </div>
+
+  <template lwc:if={showShortcutsPanel}>
+    <div
+      class="shortcuts-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Keyboard shortcuts"
+    >
+      <div class="shortcuts-panel">
+        <h2>Keyboard Shortcuts</h2>
+        <ul class="shortcuts-list">
+          <li><span>Go to Dashboard</span><kbd>1</kbd></li>
+          <li><span>Go to Job Openings</span><kbd>2</kbd></li>
+          <li><span>Go to Candidates</span><kbd>3</kbd></li>
+          <li><span>Go to Interviews</span><kbd>4</kbd></li>
+          <li><span>Go to Hiring Pipeline</span><kbd>5</kbd></li>
+          <li><span>Go to Onboarding</span><kbd>6</kbd></li>
+          <li><span>Go to Reports</span><kbd>7</kbd></li>
+          <li><span>Go to Settings</span><kbd>8</kbd></li>
+          <li><span>Focus candidate search</span><kbd>/</kbd></li>
+          <li><span>Open this panel</span><kbd>?</kbd></li>
+          <li><span>Close panel</span><kbd>Esc</kbd></li>
+        </ul>
+        <button
+          class="primary-pill"
+          type="button"
+          onclick={handleCloseShortcutsPanel}
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </template>
+
+  <div class="dashboard-shell">
+    <aside class="sidebar">
+      <div class="sidebar-heading">
+        <h2>Recruitment</h2>
+        <p>Management</p>
+      </div>
+
+      <nav class="side-nav" aria-label="Recruitment management">
+        <template for:each={navItems} for:item="item">
+          <button
+            key={item.label}
+            class={item.className}
+            type="button"
+            data-view={item.viewId}
+            aria-current={item.ariaCurrent}
+            onclick={handleNavClick}
+          >
+            <lightning-icon
+              class={decorativeIconClass}
+              icon-name={item.iconName}
+              size="small"
+              alternative-text={item.label}
+            ></lightning-icon>
+            <span>{item.label}</span>
+          </button>
+        </template>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="primary-pill" type="button" onclick={handleNewCandidate}>
+          <lightning-icon
+            class="dashboard-icon inverse-icon"
+            icon-name="utility:add"
+            size="small"
+            alternative-text="Add"
+          ></lightning-icon>
+          Add Candidate
+        </button>
+      </div>
+    </aside>
+
+    <div class="content-region">
+      <main class="main-content" id="main-content" tabindex="-1">
+        <div class="content-container">
+          <section class="page-heading">
+            <div>
+              <h1>{pageTitle}</h1>
+              <p>{pageDescription}</p>
             </div>
-
-            <nav class="side-nav" aria-label="Recruitment management">
-                <template for:each={navItems} for:item="item">
-                    <a key={item.label} class={item.className} href={item.href}>
-                        <lightning-icon
-                            class="dashboard-icon"
-                            icon-name={item.iconName}
-                            size="x-small"
-                            alternative-text={item.label}
-                        ></lightning-icon>
-                        <span>{item.label}</span>
-                    </a>
-                </template>
-            </nav>
-
-            <div class="sidebar-footer">
-                <button class="primary-pill" onclick={handleNewJobOpening}>
-                    <lightning-icon
-                        class="dashboard-icon inverse-icon"
-                        icon-name="utility:add"
-                        size="x-small"
-                        alternative-text="Add"
-                    ></lightning-icon>
-                    New Job Opening
-                </button>
+            <div class="heading-actions">
+              <button
+                class="secondary-pill"
+                type="button"
+                onclick={handleViewAnalytics}
+              >
+                View Analytics
+              </button>
+              <button
+                class="primary-pill"
+                type="button"
+                onclick={handleDownloadReport}
+              >
+                Open Reports
+              </button>
             </div>
-        </aside>
+          </section>
 
-        <div class="content-region">
-            <main class="main-content">
-                <div class="content-container">
-                    <section class="page-heading">
-                        <div>
-                            <h1>Welcome back, Recruiter</h1>
-                            <p>
-                                Manage hiring, interviews, and onboarding from
-                                one place.
-                            </p>
-                        </div>
-                        <div class="heading-actions">
-                            <button class="secondary-pill">
-                                View Analytics
-                            </button>
-                            <button class="primary-pill">
-                                Download Report
-                            </button>
-                        </div>
-                    </section>
+          <template lwc:if={hasLoadError}>
+            <div
+              class="slds-notify slds-notify_alert slds-alert_error slds-m-bottom_medium"
+              role="alert"
+            >
+              Unable to load live dashboard data. Deploy the Apex controller to
+              your org to enable dynamic metrics.
+            </div>
+          </template>
 
+          <template lwc:if={isLoading}>
+            <div class="loading-wrap slds-is-relative slds-m-vertical_large">
+              <lightning-spinner
+                alternative-text="Loading dashboard"
+                size="medium"
+              ></lightning-spinner>
+            </div>
+          </template>
+
+          <template lwc:else>
+            <div class="page-body">
+              <template lwc:if={isDashboardView}>
                 <section class="kpi-grid" aria-label="Hiring metrics">
-                    <template for:each={kpis} for:item="kpi">
-                        <article class="slds-card kpi-card" key={kpi.label}>
-                            <div class="metric-icon">
-                                <lightning-icon
-                                    class="dashboard-icon"
-                                    icon-name={kpi.iconName}
-                                    size="small"
-                                    alternative-text={kpi.label}
-                                ></lightning-icon>
-                            </div>
-                            <div class="metric-body">
-                                <p>{kpi.label}</p>
-                                <div class="metric-value-row">
-                                    <strong>{kpi.value}</strong>
-                                    <template if:true={kpi.trend}>
-                                        <span class="trend-badge">
-                                            <lightning-icon
-                                                class="dashboard-icon trend-icon"
-                                                icon-name="utility:trending"
-                                                size="xx-small"
-                                                alternative-text="Trending up"
-                                            ></lightning-icon>
-                                            {kpi.trend}
-                                        </span>
-                                    </template>
-                                </div>
-                            </div>
-                        </article>
-                    </template>
+                  <template for:each={kpis} for:item="kpi">
+                    <article class="slds-card kpi-card" key={kpi.key}>
+                      <div class="metric-icon">
+                        <lightning-icon
+                          class="dashboard-icon"
+                          icon-name={kpi.iconName}
+                          size="small"
+                          alternative-text={kpi.label}
+                        ></lightning-icon>
+                      </div>
+                      <div class="metric-body">
+                        <p>{kpi.label}</p>
+                        <div class="metric-value-row">
+                          <strong>{kpi.value}</strong>
+                        </div>
+                      </div>
+                    </article>
+                  </template>
                 </section>
 
                 <div class="dashboard-grid">
-                    <div class="primary-column">
-                        <section class="slds-card panel">
-                            <div class="panel-header">
-                                <h2>Candidate Pipeline</h2>
-                                <button class="text-link">
-                                    View Board
-                                    <lightning-icon
-                                        class="dashboard-icon link-icon"
-                                        icon-name="utility:forward"
-                                        size="xx-small"
-                                        alternative-text="View board"
-                                    ></lightning-icon>
-                                </button>
-                            </div>
+                  <div class="primary-column">
+                    <section class="slds-card panel">
+                      <div class="panel-header">
+                        <h2>Candidate Pipeline</h2>
+                        <button
+                          class="text-link"
+                          type="button"
+                          onclick={handleViewBoard}
+                        >
+                          View Board
+                          <lightning-icon
+                            class="dashboard-icon link-icon"
+                            icon-name="utility:forward"
+                            size="xx-small"
+                            alternative-text="View board"
+                          ></lightning-icon>
+                        </button>
+                      </div>
 
-                            <div class="kanban-scroll">
-                                <div class="kanban-board">
-                                    <template
-                                        for:each={pipelineStages}
-                                        for:item="stage"
-                                    >
-                                        <section
-                                            class="kanban-column"
-                                            key={stage.name}
-                                        >
-                                            <div class="kanban-title">
-                                                <span>{stage.label}</span>
-                                            </div>
-                                            <template
-                                                for:each={stage.candidates}
-                                                for:item="candidate"
-                                            >
-                                                <article
-                                                    class={candidate.cardClass}
-                                                    key={candidate.name}
-                                                >
-                                                    <div class="candidate-top">
-                                                        <strong>
-                                                            {candidate.name}
-                                                        </strong>
-                                                        <template
-                                                            if:true={candidate.status}
-                                                        >
-                                                            <span
-                                                                class={candidate.badgeClass}
-                                                            >
-                                                                {candidate.status}
-                                                            </span>
-                                                        </template>
-                                                    </div>
-                                                    <p>{candidate.role}</p>
-                                                </article>
-                                            </template>
-                                        </section>
-                                    </template>
+                      <template lwc:if={pipelineError}>
+                        <p class="empty-state">Unable to load pipeline data.</p>
+                      </template>
+                      <template lwc:elseif={hasPipeline}>
+                        <div class="kanban-scroll">
+                          <div class={dashboardKanbanClass}>
+                            <template
+                              for:each={dashboardPipelineStages}
+                              for:item="stage"
+                            >
+                              <section class={stage.stageClass} key={stage.key}>
+                                <div class="kanban-title">
+                                  <span>{stage.label}</span>
                                 </div>
-                            </div>
-                        </section>
-
-                        <section class="slds-card panel table-panel">
-                            <div class="panel-header">
-                                <h2>Upcoming Interviews</h2>
-                                <button class="icon-button" aria-label="More">
-                                    <lightning-icon
-                                        class="dashboard-icon"
-                                        icon-name="utility:threedots_vertical"
-                                        size="x-small"
-                                        alternative-text="More"
-                                    ></lightning-icon>
-                                </button>
-                            </div>
-
-                            <div class="table-scroll">
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th>Candidate</th>
-                                            <th>Position</th>
-                                            <th>Date &amp; Time</th>
-                                            <th>Interviewer</th>
-                                            <th>Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <template
-                                            for:each={interviews}
-                                            for:item="interview"
-                                        >
-                                            <tr key={interview.id}>
-                                                <td class="candidate-name">
-                                                    {interview.candidate}
-                                                </td>
-                                                <td>{interview.position}</td>
-                                                <td>{interview.date}</td>
-                                                <td>{interview.interviewer}</td>
-                                                <td>
-                                                    <span
-                                                        class={interview.statusClass}
-                                                    >
-                                                        {interview.status}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        </template>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </section>
-                    </div>
-
-                    <aside class="secondary-column">
-                        <section class="slds-card action-panel">
-                            <h2>Quick Actions</h2>
-                            <div class="quick-actions">
-                                <template
-                                    for:each={quickActions}
-                                    for:item="action"
-                                >
+                                <div class="kanban-column-cards">
+                                  <template
+                                    for:each={stage.candidates}
+                                    for:item="candidate"
+                                  >
                                     <button
-                                        class="quick-action"
-                                        data-object-api-name={action.objectApiName}
-                                        key={action.label}
-                                        onclick={handleQuickAction}
+                                      class={candidate.cardClass}
+                                      key={candidate.key}
+                                      type="button"
+                                      data-id={candidate.recordId}
+                                      onclick={handleCandidateClick}
                                     >
-                                        <lightning-icon
-                                            class="dashboard-icon"
-                                            icon-name={action.iconName}
-                                            size="small"
-                                            alternative-text={action.label}
-                                        ></lightning-icon>
-                                        {action.label}
+                                      <div class="candidate-top">
+                                        <strong>{candidate.name}</strong>
+                                        <span class="candidate-view-hint"
+                                          >View</span
+                                        >
+                                        <template lwc:if={candidate.showStatus}>
+                                          <span class={candidate.badgeClass}>
+                                            {candidate.status}
+                                          </span>
+                                        </template>
+                                      </div>
+                                      <p>{candidate.role}</p>
                                     </button>
+                                  </template>
+                                </div>
+                                <template lwc:if={stage.hasMoreCandidates}>
+                                  <button
+                                    class="text-link stage-more-link"
+                                    type="button"
+                                    onclick={handleViewBoard}
+                                  >
+                                    {stage.moreLabel}
+                                  </button>
                                 </template>
-                            </div>
-                        </section>
+                              </section>
+                            </template>
+                          </div>
+                        </div>
+                      </template>
+                      <template lwc:else>
+                        <p class="empty-state">
+                          No active candidates yet. Add a lead to start building
+                          your pipeline.
+                        </p>
+                      </template>
+                    </section>
 
-                        <section class="slds-card onboarding-panel">
-                            <h2>Onboarding Progress</h2>
-                            <div class="progress-summary">
-                                <span>Global Tasks</span>
-                                <strong>65%</strong>
-                            </div>
-                            <div class="progress-bar">
-                                <div class="progress-fill"></div>
-                            </div>
+                    <section class="slds-card panel table-panel">
+                      <div class="panel-header">
+                        <h2>Upcoming Interviews</h2>
+                        <button
+                          class="icon-button"
+                          type="button"
+                          aria-label="Open interviews"
+                          data-view="interviews"
+                          onclick={handleNavClick}
+                        >
+                          <lightning-icon
+                            class="dashboard-icon"
+                            icon-name="utility:event"
+                            size="x-small"
+                            alternative-text="Open interviews"
+                          ></lightning-icon>
+                        </button>
+                      </div>
 
-                            <ul class="checklist">
-                                <template
-                                    for:each={onboardingTasks}
-                                    for:item="task"
+                      <template lwc:if={interviewsError}>
+                        <p class="empty-state">Unable to load interviews.</p>
+                      </template>
+                      <template lwc:elseif={hasInterviews}>
+                        <template lwc:if={a11y.tableSummaries}>
+                          <p id="dashboard-interviews-summary" class="sr-only">
+                            Table of upcoming interviews with candidate,
+                            position, date, interviewer, and status columns.
+                          </p>
+                        </template>
+                        <div class="table-scroll">
+                          <table aria-describedby={interviewsTableDescribedBy}>
+                            <thead>
+                              <tr>
+                                <th>Candidate</th>
+                                <th>Position</th>
+                                <th>Date &amp; Time</th>
+                                <th>Interviewer</th>
+                                <th>Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <template
+                                for:each={interviews}
+                                for:item="interview"
+                              >
+                                <tr
+                                  key={interview.key}
+                                  class="clickable-row"
+                                  role="button"
+                                  tabindex="0"
+                                  data-id={interview.recordId}
+                                  onclick={handleInterviewClick}
+                                  onkeydown={handleInterviewKeydown}
                                 >
-                                    <li class={task.className} key={task.label}>
-                                        <lightning-icon
-                                            class="dashboard-icon"
-                                            icon-name={task.iconName}
-                                            size="x-small"
-                                            alternative-text={task.label}
-                                        ></lightning-icon>
-                                        <span>{task.label}</span>
-                                    </li>
-                                </template>
+                                  <td class="candidate-name">
+                                    {interview.candidate}
+                                  </td>
+                                  <td>{interview.position}</td>
+                                  <td>{interview.date}</td>
+                                  <td>{interview.interviewer}</td>
+                                  <td>
+                                    <span class={interview.statusClass}>
+                                      {interview.status}
+                                    </span>
+                                  </td>
+                                </tr>
+                              </template>
+                            </tbody>
+                          </table>
+                        </div>
+                      </template>
+                      <template lwc:else>
+                        <p class="empty-state">
+                          No upcoming interviews scheduled.
+                        </p>
+                      </template>
+                    </section>
+                  </div>
+
+                  <aside class="secondary-column">
+                    <section class="slds-card action-panel">
+                      <h2>Quick Actions</h2>
+                      <div class="quick-actions">
+                        <template for:each={quickActions} for:item="action">
+                          <button
+                            class="quick-action"
+                            data-object={action.objectApiName}
+                            key={action.label}
+                            type="button"
+                            onclick={handleQuickAction}
+                          >
+                            <lightning-icon
+                              class="dashboard-icon"
+                              icon-name={action.iconName}
+                              size="small"
+                              alternative-text={action.label}
+                            ></lightning-icon>
+                            {action.label}
+                          </button>
+                        </template>
+                      </div>
+                    </section>
+
+                    <section class="slds-card onboarding-panel">
+                      <h2>Onboarding Progress</h2>
+                      <div class="progress-summary">
+                        <span>Global Tasks</span>
+                        <strong>{progressLabel}</strong>
+                      </div>
+                      <div class="progress-bar">
+                        <div
+                          class="progress-fill"
+                          style={progressFillStyle}
+                        ></div>
+                      </div>
+
+                      <template lwc:if={onboardingError}>
+                        <p class="empty-state">
+                          Unable to load onboarding tasks.
+                        </p>
+                      </template>
+                      <template lwc:else>
+                        <ul class="checklist">
+                          <template for:each={onboardingTasks} for:item="task">
+                            <li class={task.className} key={task.key}>
+                              <lightning-icon
+                                class="dashboard-icon"
+                                icon-name={task.iconName}
+                                size="x-small"
+                                alternative-text={task.label}
+                              ></lightning-icon>
+                              <span>{task.label}</span>
+                            </li>
+                          </template>
+                        </ul>
+                      </template>
+                    </section>
+
+                    <section class="slds-card activity-panel">
+                      <div class="panel-header">
+                        <h2>Recent Activity</h2>
+                      </div>
+                      <div class="activity-list">
+                        <template lwc:if={activityError}>
+                          <p class="empty-state">
+                            Unable to load recent activity.
+                          </p>
+                        </template>
+                        <template lwc:elseif={hasActivity}>
+                          <template
+                            for:each={recentActivity}
+                            for:item="activity"
+                          >
+                            <article
+                              class={activity.className}
+                              key={activity.key}
+                            >
+                              <span class={activity.dotClass}></span>
+                              <div>
+                                <p>{activity.message}</p>
+                                <small>{activity.time}</small>
+                              </div>
+                            </article>
+                          </template>
+                        </template>
+                        <template lwc:else>
+                          <p class="empty-state">
+                            No recent candidate activity.
+                          </p>
+                        </template>
+                        <button
+                          class="text-link full-width"
+                          type="button"
+                          onclick={handleViewAllActivity}
+                        >
+                          View all activity
+                        </button>
+                      </div>
+                    </section>
+                  </aside>
+                </div>
+              </template>
+
+              <template lwc:if={isJobOpeningsView}>
+                <section class="view-stack">
+                  <template lwc:if={jobOpeningsError}>
+                    <p class="empty-state">Unable to load job openings.</p>
+                  </template>
+                  <template lwc:elseif={hasJobOpenings}>
+                    <div class="card-grid">
+                      <template for:each={jobOpenings} for:item="opening">
+                        <button
+                          class={opening.cardClass}
+                          key={opening.key}
+                          type="button"
+                          data-title={opening.title}
+                          onclick={handleJobOpeningClick}
+                        >
+                          <div class="entity-card-header">
+                            <lightning-icon
+                              class="dashboard-icon"
+                              icon-name="standard:job_position"
+                              size="small"
+                              alternative-text={opening.title}
+                            ></lightning-icon>
+                            <span class={opening.statusClass}
+                              >{opening.status}</span
+                            >
+                          </div>
+                          <h2>{opening.title}</h2>
+                          <p>{opening.candidateCountLabel}</p>
+                          <span class="entity-card-link">View candidates</span>
+                        </button>
+                      </template>
+                    </div>
+                  </template>
+                  <template lwc:else>
+                    <p class="empty-state">
+                      No open job groups are available yet.
+                    </p>
+                  </template>
+                </section>
+              </template>
+
+              <template lwc:if={isCandidatesView}>
+                <section class="view-stack">
+                  <div class="view-toolbar">
+                    <lightning-input
+                      type="search"
+                      label="Search candidates"
+                      data-id="candidate-search"
+                      value={candidateSearchTerm}
+                      onchange={handleCandidateSearchChange}
+                    ></lightning-input>
+                    <button
+                      class="primary-pill"
+                      type="button"
+                      onclick={handleNewCandidate}
+                    >
+                      Add Candidate
+                    </button>
+                  </div>
+
+                  <template lwc:if={candidatesError}>
+                    <p class="empty-state">Unable to load candidates.</p>
+                  </template>
+                  <template lwc:elseif={hasFilteredCandidates}>
+                    <div class="card-grid">
+                      <template
+                        for:each={filteredCandidates}
+                        for:item="candidate"
+                      >
+                        <button
+                          class={candidate.listCardClass}
+                          key={candidate.key}
+                          type="button"
+                          data-id={candidate.recordId}
+                          onclick={handleCandidateClick}
+                        >
+                          <div class="entity-card-header">
+                            <span class={candidate.statusClass}>
+                              {candidate.status}
+                            </span>
+                            <span class="candidate-view-hint">View</span>
+                          </div>
+                          <h2>{candidate.name}</h2>
+                          <p>{candidate.company}</p>
+                          <small>{candidate.email}</small>
+                          <small>Created {candidate.dateLabel}</small>
+                        </button>
+                      </template>
+                    </div>
+                  </template>
+                  <template lwc:else>
+                    <p class="empty-state">No candidates match this search.</p>
+                  </template>
+                </section>
+              </template>
+
+              <template lwc:if={isInterviewsView}>
+                <section class="slds-card panel table-panel">
+                  <div class="panel-header">
+                    <h2>All Upcoming Interviews</h2>
+                    <button
+                      class="primary-pill compact-pill"
+                      type="button"
+                      data-object="Event"
+                      onclick={handleQuickAction}
+                    >
+                      Schedule Interview
+                    </button>
+                  </div>
+
+                  <template lwc:if={allInterviewsError}>
+                    <p class="empty-state">Unable to load interviews.</p>
+                  </template>
+                  <template lwc:elseif={hasAllInterviews}>
+                    <template lwc:if={a11y.tableSummaries}>
+                      <p id="all-interviews-summary" class="sr-only">
+                        Table of all upcoming interviews with candidate,
+                        position, date, interviewer, and status columns.
+                      </p>
+                    </template>
+                    <div class="table-scroll">
+                      <table aria-describedby={interviewsTableDescribedBy}>
+                        <thead>
+                          <tr>
+                            <th>Candidate</th>
+                            <th>Position</th>
+                            <th>Date &amp; Time</th>
+                            <th>Interviewer</th>
+                            <th>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <template
+                            for:each={allInterviews}
+                            for:item="interview"
+                          >
+                            <tr
+                              key={interview.key}
+                              class="clickable-row"
+                              role="button"
+                              tabindex="0"
+                              data-id={interview.recordId}
+                              onclick={handleInterviewClick}
+                              onkeydown={handleInterviewKeydown}
+                            >
+                              <td class="candidate-name">
+                                {interview.candidate}
+                              </td>
+                              <td>{interview.position}</td>
+                              <td>{interview.date}</td>
+                              <td>{interview.interviewer}</td>
+                              <td>
+                                <span class={interview.statusClass}>
+                                  {interview.status}
+                                </span>
+                              </td>
+                            </tr>
+                          </template>
+                        </tbody>
+                      </table>
+                    </div>
+                  </template>
+                  <template lwc:else>
+                    <p class="empty-state">No upcoming interviews scheduled.</p>
+                  </template>
+                </section>
+              </template>
+
+              <template lwc:if={isHiringPipelineView}>
+                <section class="slds-card panel">
+                  <div class="panel-header">
+                    <h2>Hiring Pipeline Board</h2>
+                    <button
+                      class="primary-pill compact-pill"
+                      type="button"
+                      onclick={handleNewCandidate}
+                    >
+                      Add Candidate
+                    </button>
+                  </div>
+
+                  <template lwc:if={pipelineError}>
+                    <p class="empty-state">Unable to load pipeline data.</p>
+                  </template>
+                  <template lwc:elseif={hasPipeline}>
+                    <template lwc:if={usePipelineListView}>
+                      <div class="pipeline-list-view">
+                        <template
+                          for:each={pipelineListStages}
+                          for:item="stage"
+                        >
+                          <section class="pipeline-list-stage" key={stage.key}>
+                            <h3>{stage.label}</h3>
+                            <ul class="pipeline-list-items">
+                              <template
+                                for:each={stage.listCandidates}
+                                for:item="candidate"
+                              >
+                                <li key={candidate.key}>
+                                  <button
+                                    class="pipeline-list-item"
+                                    type="button"
+                                    data-id={candidate.recordId}
+                                    onclick={handleCandidateClick}
+                                  >
+                                    {candidate.listLabel}
+                                  </button>
+                                </li>
+                              </template>
                             </ul>
-                        </section>
-
-                        <section class="slds-card activity-panel">
-                            <div class="panel-header">
-                                <h2>Recent Activity</h2>
-                            </div>
-                            <div class="activity-list">
-                                <template
-                                    for:each={recentActivity}
-                                    for:item="activity"
-                                >
-                                    <article
-                                        class={activity.className}
-                                        key={activity.message}
+                          </section>
+                        </template>
+                      </div>
+                    </template>
+                    <template lwc:else>
+                      <div class="kanban-scroll">
+                        <div class={fullKanbanClass}>
+                          <template for:each={pipelineStages} for:item="stage">
+                            <section class={stage.stageClass} key={stage.key}>
+                              <div class="kanban-title">
+                                <span>{stage.label}</span>
+                              </div>
+                              <template lwc:if={stage.hasCandidates}>
+                                <div class="kanban-column-cards">
+                                  <template
+                                    for:each={stage.candidates}
+                                    for:item="candidate"
+                                  >
+                                    <button
+                                      class={candidate.cardClass}
+                                      key={candidate.key}
+                                      type="button"
+                                      data-id={candidate.recordId}
+                                      onclick={handleCandidateClick}
                                     >
-                                        <span class={activity.dotClass}></span>
-                                        <div>
-                                            <p>{activity.message}</p>
-                                            <small>{activity.time}</small>
-                                        </div>
-                                    </article>
-                                </template>
-                                <button class="text-link full-width">
-                                    View all activity
-                                </button>
-                            </div>
-                        </section>
-                    </aside>
-                </div>
-                </div>
-            </main>
+                                      <div class="candidate-top">
+                                        <strong>{candidate.name}</strong>
+                                        <span class="candidate-view-hint"
+                                          >View</span
+                                        >
+                                        <template lwc:if={candidate.showStatus}>
+                                          <span class={candidate.badgeClass}>
+                                            {candidate.status}
+                                          </span>
+                                        </template>
+                                      </div>
+                                      <p>{candidate.role}</p>
+                                    </button>
+                                  </template>
+                                </div>
+                              </template>
+                              <template lwc:else>
+                                <p class="empty-state compact-empty">
+                                  No candidates in this stage.
+                                </p>
+                              </template>
+                            </section>
+                          </template>
+                        </div>
+                      </div>
+                    </template>
+                  </template>
+                  <template lwc:else>
+                    <p class="empty-state">
+                      No active candidates yet. Add a lead to start building
+                      your pipeline.
+                    </p>
+                  </template>
+                </section>
+              </template>
 
-            <footer class="footer">
-                <span>© 2024 Patriot Solutions. Version 4.2.1-stable</span>
-                <nav aria-label="Footer">
-                    <a href="#">Privacy Policy</a>
-                    <a href="#">Terms of Service</a>
-                    <a href="#">Support</a>
-                </nav>
-            </footer>
+              <template lwc:if={isOnboardingView}>
+                <section class="slds-card onboarding-panel onboarding-page">
+                  <div class="panel-header clean-header">
+                    <h2>Onboarding Progress</h2>
+                  </div>
+                  <div class="progress-summary large-progress-summary">
+                    <span>Global Tasks</span>
+                    <strong>{progressLabel}</strong>
+                  </div>
+                  <div class="progress-bar large-progress-bar">
+                    <div class="progress-fill" style={progressFillStyle}></div>
+                  </div>
+
+                  <template lwc:if={onboardingError}>
+                    <p class="empty-state">Unable to load onboarding tasks.</p>
+                  </template>
+                  <template lwc:else>
+                    <ul class="checklist onboarding-checklist">
+                      <template for:each={onboardingTasks} for:item="task">
+                        <li class={task.className} key={task.key}>
+                          <lightning-icon
+                            class="dashboard-icon"
+                            icon-name={task.iconName}
+                            size="x-small"
+                            alternative-text={task.label}
+                          ></lightning-icon>
+                          <span>{task.label}</span>
+                        </li>
+                      </template>
+                    </ul>
+                  </template>
+                </section>
+              </template>
+
+              <template lwc:if={isReportsView}>
+                <section class="view-stack">
+                  <section
+                    class="kpi-grid"
+                    aria-label="Recruiting report metrics"
+                  >
+                    <template for:each={kpis} for:item="kpi">
+                      <article class="slds-card kpi-card" key={kpi.key}>
+                        <div class="metric-icon">
+                          <lightning-icon
+                            class="dashboard-icon"
+                            icon-name={kpi.iconName}
+                            size="small"
+                            alternative-text={kpi.label}
+                          ></lightning-icon>
+                        </div>
+                        <div class="metric-body">
+                          <p>{kpi.label}</p>
+                          <div class="metric-value-row">
+                            <strong>{kpi.value}</strong>
+                          </div>
+                        </div>
+                      </article>
+                    </template>
+                  </section>
+                  <div class="card-grid">
+                    <article class="entity-card report-card">
+                      <h2>Recruitment Reports</h2>
+                      <p>
+                        Open Salesforce reports for deeper recruiting analysis.
+                      </p>
+                      <button
+                        class="primary-pill"
+                        type="button"
+                        onclick={handleOpenReportsHome}
+                      >
+                        Open Reports
+                      </button>
+                    </article>
+                    <article class="entity-card report-card">
+                      <h2>Dashboards</h2>
+                      <p>
+                        Jump to Salesforce dashboard views when you need charts.
+                      </p>
+                      <button
+                        class="secondary-pill"
+                        type="button"
+                        onclick={handleOpenDashboardsHome}
+                      >
+                        Open Dashboards
+                      </button>
+                    </article>
+                  </div>
+                </section>
+              </template>
+
+              <template lwc:if={isSettingsView}>
+                <section class="view-stack settings-page">
+                  <div class="settings-preview-row">
+                    <span class="settings-preview-badge"
+                      >Active profile: {accessibilityPreviewBadge}</span
+                    >
+                  </div>
+
+                  <section class="settings-section a11y-settings">
+                    <h2 class="settings-section-title">Accessibility</h2>
+                    <div class="settings-section-body">
+                      <fieldset class="settings-fieldset">
+                        <legend>Vision and Reading</legend>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Text size</h3>
+                            <p>Scale all text from 80% to 200%.</p>
+                            <div class="font-scale-presets">
+                              <button
+                                class="font-scale-preset"
+                                type="button"
+                                data-scale="80"
+                                onclick={handleFontScalePreset}
+                              >
+                                Small
+                              </button>
+                              <button
+                                class="font-scale-preset"
+                                type="button"
+                                data-scale="100"
+                                onclick={handleFontScalePreset}
+                              >
+                                Default
+                              </button>
+                              <button
+                                class="font-scale-preset"
+                                type="button"
+                                data-scale="125"
+                                onclick={handleFontScalePreset}
+                              >
+                                Large
+                              </button>
+                              <button
+                                class="font-scale-preset"
+                                type="button"
+                                data-scale="150"
+                                onclick={handleFontScalePreset}
+                              >
+                                Extra Large
+                              </button>
+                            </div>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-slider
+                              label="Text size percentage"
+                              min="80"
+                              max="200"
+                              step="5"
+                              value={a11y.fontScale}
+                              data-pref="fontScale"
+                              onchange={handlePreferenceChange}
+                            ></lightning-slider>
+                          </div>
+                        </div>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Line height</h3>
+                            <p>Increase spacing between lines of text.</p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-combobox
+                              label="Line height"
+                              value={a11y.lineHeight}
+                              options={lineHeightOptions}
+                              data-pref="lineHeight"
+                              onchange={handlePreferenceChange}
+                            ></lightning-combobox>
+                          </div>
+                        </div>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Letter spacing</h3>
+                            <p>Widen spacing between characters.</p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-combobox
+                              label="Letter spacing"
+                              value={a11y.letterSpacing}
+                              options={letterSpacingOptions}
+                              data-pref="letterSpacing"
+                              onchange={handlePreferenceChange}
+                            ></lightning-combobox>
+                          </div>
+                        </div>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Font style</h3>
+                            <p>Choose a typeface optimized for readability.</p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-combobox
+                              label="Font style"
+                              value={a11y.fontFamily}
+                              options={fontFamilyOptions}
+                              data-pref="fontFamily"
+                              onchange={handlePreferenceChange}
+                            ></lightning-combobox>
+                          </div>
+                        </div>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Bold text</h3>
+                            <p>Increase font weight across the workspace.</p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-input
+                              type="checkbox"
+                              label="Bold text"
+                              checked={a11y.boldText}
+                              data-pref="boldText"
+                              onchange={handlePreferenceChange}
+                            ></lightning-input>
+                          </div>
+                        </div>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>High contrast</h3>
+                            <p>Use maximum contrast colors for readability.</p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-input
+                              type="checkbox"
+                              label="High contrast"
+                              checked={a11y.highContrast}
+                              data-pref="highContrast"
+                              onchange={handlePreferenceChange}
+                            ></lightning-input>
+                          </div>
+                        </div>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Dark mode</h3>
+                            <p>Switch to a dark color scheme.</p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-combobox
+                              label="Theme"
+                              value={a11y.theme}
+                              options={themeOptions}
+                              data-pref="theme"
+                              onchange={handlePreferenceChange}
+                            ></lightning-combobox>
+                          </div>
+                        </div>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Color vision</h3>
+                            <p>
+                              Simulate color blindness (assistive preview, not a
+                              color fix).
+                            </p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-combobox
+                              label="Color vision"
+                              value={a11y.colorVision}
+                              options={colorVisionOptions}
+                              data-pref="colorVision"
+                              onchange={handlePreferenceChange}
+                            ></lightning-combobox>
+                          </div>
+                        </div>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Reduce transparency</h3>
+                            <p>
+                              Use solid backgrounds instead of translucent
+                              panels.
+                            </p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-input
+                              type="checkbox"
+                              label="Reduce transparency"
+                              checked={a11y.reduceTransparency}
+                              data-pref="reduceTransparency"
+                              onchange={handlePreferenceChange}
+                            ></lightning-input>
+                          </div>
+                        </div>
+                      </fieldset>
+
+                      <fieldset class="settings-fieldset">
+                        <legend>Motion and Animation</legend>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Reduce motion</h3>
+                            <p>Disable animations and transitions.</p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-input
+                              type="checkbox"
+                              label="Reduce motion"
+                              checked={a11y.reduceMotion}
+                              data-pref="reduceMotion"
+                              onchange={handlePreferenceChange}
+                            ></lightning-input>
+                          </div>
+                        </div>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Disable card hover lift</h3>
+                            <p>Stop cards from moving on hover.</p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-input
+                              type="checkbox"
+                              label="Disable card lift"
+                              checked={a11y.disableCardLift}
+                              data-pref="disableCardLift"
+                              onchange={handlePreferenceChange}
+                            ></lightning-input>
+                          </div>
+                        </div>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Sync with OS motion preference</h3>
+                            <p>
+                              Automatically reduce motion when your system
+                              requests it.
+                            </p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-input
+                              type="checkbox"
+                              label="Sync OS motion"
+                              checked={a11y.syncOsMotion}
+                              data-pref="syncOsMotion"
+                              onchange={handlePreferenceChange}
+                            ></lightning-input>
+                          </div>
+                        </div>
+                      </fieldset>
+
+                      <fieldset class="settings-fieldset">
+                        <legend>Focus and Keyboard</legend>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Enhanced focus ring</h3>
+                            <p>
+                              Show a thicker, high-visibility focus indicator.
+                            </p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-input
+                              type="checkbox"
+                              label="Enhanced focus"
+                              checked={a11y.enhancedFocus}
+                              data-pref="enhancedFocus"
+                              onchange={handlePreferenceChange}
+                            ></lightning-input>
+                          </div>
+                        </div>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Always show focus</h3>
+                            <p>Display focus rings on mouse clicks too.</p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-input
+                              type="checkbox"
+                              label="Always show focus"
+                              checked={a11y.alwaysShowFocus}
+                              data-pref="alwaysShowFocus"
+                              onchange={handlePreferenceChange}
+                            ></lightning-input>
+                          </div>
+                        </div>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Focus ring color</h3>
+                            <p>
+                              Choose the color of keyboard focus indicators.
+                            </p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-combobox
+                              label="Focus ring color"
+                              value={a11y.focusRingColor}
+                              options={focusRingColorOptions}
+                              data-pref="focusRingColor"
+                              onchange={handlePreferenceChange}
+                            ></lightning-combobox>
+                          </div>
+                        </div>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Skip to main content</h3>
+                            <p>
+                              Show a skip link for keyboard users at page top.
+                            </p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-input
+                              type="checkbox"
+                              label="Skip link"
+                              checked={a11y.skipLink}
+                              data-pref="skipLink"
+                              onchange={handlePreferenceChange}
+                            ></lightning-input>
+                          </div>
+                        </div>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>View change announcements</h3>
+                            <p>
+                              Announce navigation changes to screen readers.
+                            </p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-input
+                              type="checkbox"
+                              label="Announce views"
+                              checked={a11y.announceViewChanges}
+                              data-pref="announceViewChanges"
+                              onchange={handlePreferenceChange}
+                            ></lightning-input>
+                          </div>
+                        </div>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Keyboard shortcuts</h3>
+                            <p>
+                              Press ? anywhere to open the shortcuts reference.
+                            </p>
+                          </div>
+                          <div class="settings-control">
+                            <button
+                              class="secondary-pill"
+                              type="button"
+                              onclick={handleOpenShortcutsPanel}
+                            >
+                              View shortcuts
+                            </button>
+                          </div>
+                        </div>
+                      </fieldset>
+
+                      <fieldset class="settings-fieldset">
+                        <legend>Screen Reader</legend>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Verbose announcements</h3>
+                            <p>
+                              Include record counts in navigation announcements.
+                            </p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-input
+                              type="checkbox"
+                              label="Verbose announcements"
+                              checked={a11y.verboseAnnouncements}
+                              data-pref="verboseAnnouncements"
+                              onchange={handlePreferenceChange}
+                            ></lightning-input>
+                          </div>
+                        </div>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Announce loading states</h3>
+                            <p>Notify when data finishes loading.</p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-input
+                              type="checkbox"
+                              label="Announce loading"
+                              checked={a11y.announceLoading}
+                              data-pref="announceLoading"
+                              onchange={handlePreferenceChange}
+                            ></lightning-input>
+                          </div>
+                        </div>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Hide decorative icons</h3>
+                            <p>
+                              Hide icons that duplicate visible text labels.
+                            </p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-input
+                              type="checkbox"
+                              label="Hide decorative icons"
+                              checked={a11y.hideDecorativeIcons}
+                              data-pref="hideDecorativeIcons"
+                              onchange={handlePreferenceChange}
+                            ></lightning-input>
+                          </div>
+                        </div>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Table summaries</h3>
+                            <p>Add descriptive summaries to data tables.</p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-input
+                              type="checkbox"
+                              label="Table summaries"
+                              checked={a11y.tableSummaries}
+                              data-pref="tableSummaries"
+                              onchange={handlePreferenceChange}
+                            ></lightning-input>
+                          </div>
+                        </div>
+                      </fieldset>
+
+                      <fieldset class="settings-fieldset">
+                        <legend>Pointer, Touch, and Motor</legend>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Larger touch targets</h3>
+                            <p>
+                              Minimum 44px tap areas on buttons and nav items.
+                            </p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-input
+                              type="checkbox"
+                              label="Large touch targets"
+                              checked={a11y.largeTouchTargets}
+                              data-pref="largeTouchTargets"
+                              onchange={handlePreferenceChange}
+                            ></lightning-input>
+                          </div>
+                        </div>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Always show action hints</h3>
+                            <p>Keep View hints visible without hovering.</p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-input
+                              type="checkbox"
+                              label="Always show hints"
+                              checked={a11y.alwaysShowHints}
+                              data-pref="alwaysShowHints"
+                              onchange={handlePreferenceChange}
+                            ></lightning-input>
+                          </div>
+                        </div>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Extended click areas</h3>
+                            <p>
+                              Add extra padding to clickable rows and cards.
+                            </p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-input
+                              type="checkbox"
+                              label="Extended click areas"
+                              checked={a11y.extendedClickAreas}
+                              data-pref="extendedClickAreas"
+                              onchange={handlePreferenceChange}
+                            ></lightning-input>
+                          </div>
+                        </div>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Underline links</h3>
+                            <p>
+                              Always underline text links and footer navigation.
+                            </p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-input
+                              type="checkbox"
+                              label="Underline links"
+                              checked={a11y.underlineLinks}
+                              data-pref="underlineLinks"
+                              onchange={handlePreferenceChange}
+                            ></lightning-input>
+                          </div>
+                        </div>
+                      </fieldset>
+
+                      <fieldset class="settings-fieldset">
+                        <legend>Content and Layout</legend>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Simplified layout</h3>
+                            <p>
+                              Flatten cards, remove shadows, simplify badges.
+                            </p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-input
+                              type="checkbox"
+                              label="Simplified layout"
+                              checked={a11y.simplifiedLayout}
+                              data-pref="simplifiedLayout"
+                              onchange={handlePreferenceChange}
+                            ></lightning-input>
+                          </div>
+                        </div>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Table density</h3>
+                            <p>Adjust row spacing in interview tables.</p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-combobox
+                              label="Table density"
+                              value={a11y.tableDensity}
+                              options={tableDensityOptions}
+                              data-pref="tableDensity"
+                              onchange={handlePreferenceChange}
+                            ></lightning-combobox>
+                          </div>
+                        </div>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Pipeline list view</h3>
+                            <p>
+                              Show hiring pipeline as a vertical list instead of
+                              kanban columns.
+                            </p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-input
+                              type="checkbox"
+                              label="Pipeline list view"
+                              checked={a11y.pipelineListView}
+                              data-pref="pipelineListView"
+                              onchange={handlePreferenceChange}
+                            ></lightning-input>
+                          </div>
+                        </div>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Sticky sidebar labels</h3>
+                            <p>
+                              Keep nav text labels visible on narrow screens.
+                            </p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-input
+                              type="checkbox"
+                              label="Sticky sidebar labels"
+                              checked={a11y.stickySidebarLabels}
+                              data-pref="stickySidebarLabels"
+                              onchange={handlePreferenceChange}
+                            ></lightning-input>
+                          </div>
+                        </div>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Reduce visual clutter</h3>
+                            <p>
+                              Hide decorative metric icons and status pills.
+                            </p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-input
+                              type="checkbox"
+                              label="Reduce clutter"
+                              checked={a11y.reduceClutter}
+                              data-pref="reduceClutter"
+                              onchange={handlePreferenceChange}
+                            ></lightning-input>
+                          </div>
+                        </div>
+                      </fieldset>
+
+                      <fieldset class="settings-fieldset">
+                        <legend>System and Reset</legend>
+
+                        <div class="settings-row">
+                          <div class="settings-row-info">
+                            <h3>Sync with OS preferences</h3>
+                            <p>
+                              Match reduced motion, contrast, and color scheme
+                              from your operating system.
+                            </p>
+                          </div>
+                          <div class="settings-control">
+                            <lightning-input
+                              type="checkbox"
+                              label="Sync OS preferences"
+                              checked={a11y.syncOsPreferences}
+                              data-pref="syncOsPreferences"
+                              onchange={handlePreferenceChange}
+                            ></lightning-input>
+                          </div>
+                        </div>
+
+                        <div class="settings-actions">
+                          <button
+                            class="secondary-pill"
+                            type="button"
+                            onclick={handleResetAccessibility}
+                          >
+                            Reset accessibility to defaults
+                          </button>
+                        </div>
+
+                        <div class="a11y-statement">
+                          <strong>Accessibility statement</strong>
+                          <p>
+                            Patriot Solutions Recruitment Workspace targets WCAG
+                            2.1 Level AA. Known limitations: color vision
+                            filters are simulations only; some Salesforce native
+                            pages opened via navigation are outside this
+                            component's accessibility scope. Contact your
+                            administrator for accommodation requests.
+                          </p>
+                        </div>
+                      </fieldset>
+                    </div>
+                  </section>
+
+                  <article class="entity-card settings-card">
+                    <div class="entity-card-header">
+                      <lightning-icon
+                        class="dashboard-icon"
+                        icon-name="utility:settings"
+                        size="small"
+                        alternative-text="Settings"
+                      ></lightning-icon>
+                      <span class="status-badge pending">Workspace</span>
+                    </div>
+                    <h2>Recruitment Workspace Settings</h2>
+                    <p>
+                      Configure how the recruitment workspace behaves. Pipeline,
+                      navigation, and report shortcuts are summarized below.
+                    </p>
+                  </article>
+                  <div class="settings-grid">
+                    <article class="entity-card">
+                      <h2>Pipeline Display</h2>
+                      <p>
+                        Vertical stage layout with per-stage scrolling is
+                        enabled.
+                      </p>
+                    </article>
+                    <article class="entity-card">
+                      <h2>Navigation</h2>
+                      <p>
+                        Sidebar buttons keep users in the recruitment workspace.
+                      </p>
+                    </article>
+                    <article class="entity-card">
+                      <h2>Reports</h2>
+                      <p>
+                        Report and dashboard shortcuts open native Salesforce
+                        pages.
+                      </p>
+                    </article>
+                  </div>
+
+                  <details class="settings-accordion-item">
+                    <summary>Display and Pipeline</summary>
+                    <div class="settings-accordion-body">
+                      <article class="entity-card">
+                        <h2>Pipeline layout</h2>
+                        <p>
+                          Use the Accessibility section to switch the hiring
+                          pipeline to an accessible list view. Kanban board view
+                          remains the default.
+                        </p>
+                      </article>
+                      <article class="entity-card">
+                        <h2>Dashboard density</h2>
+                        <p>
+                          Table density and simplified layout options are
+                          available under Accessibility → Content and Layout.
+                        </p>
+                      </article>
+                    </div>
+                  </details>
+                </section>
+              </template>
+            </div>
+          </template>
         </div>
+      </main>
+
+      <footer class="footer">
+        <span>© 2024 Patriot Solutions. Version 4.2.1-stable</span>
+        <nav aria-label="Footer">
+          <button
+            class="footer-link"
+            type="button"
+            data-view="candidates"
+            onclick={handleNavClick}
+          >
+            Candidates
+          </button>
+          <button
+            class="footer-link"
+            type="button"
+            data-view="reports"
+            onclick={handleNavClick}
+          >
+            Reports
+          </button>
+          <button
+            class="footer-link"
+            type="button"
+            data-view="dashboard"
+            onclick={handleNavClick}
+          >
+            Dashboard
+          </button>
+        </nav>
+      </footer>
     </div>
+  </div>
 </template>
