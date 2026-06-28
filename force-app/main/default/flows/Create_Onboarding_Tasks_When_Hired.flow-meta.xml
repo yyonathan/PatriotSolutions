@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>67.0</apiVersion>
+    <areMetricsLoggedToDataCloud>false</areMetricsLoggedToDataCloud>
+    <decisions>
+        <name>Was_Newly_Hired</name>
+        <label>Was Newly Hired?</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <defaultConnectorLabel>Already Hired</defaultConnectorLabel>
+        <rules>
+            <name>Stage_Changed_To_Hired</name>
+            <conditionLogic>or</conditionLogic>
+            <conditions>
+                <leftValueReference>$Record__Prior.Stage__c</leftValueReference>
+                <operator>NotEqualTo</operator>
+                <rightValue>
+                    <stringValue>Hired</stringValue>
+                </rightValue>
+            </conditions>
+            <conditions>
+                <leftValueReference>$Record__Prior.Stage__c</leftValueReference>
+                <operator>IsNull</operator>
+                <rightValue>
+                    <booleanValue>true</booleanValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>Create_Offer_Letter_Task</targetReference>
+            </connector>
+            <label>Stage Changed to Hired</label>
+        </rules>
+    </decisions>
+    <environments>Default</environments>
+    <interviewLabel>Create Onboarding Tasks When Hired {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>Create Onboarding Tasks When Hired</label>
+    <processMetadataValues>
+        <name>BuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>CanvasMode</name>
+        <value>
+            <stringValue>AUTO_LAYOUT_CANVAS</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>OriginBuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processType>AutoLaunchedFlow</processType>
+    <recordCreates>
+        <name>Create_Background_Check_Task</name>
+        <label>Create Background Check Task</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Create_Equipment_Task</targetReference>
+        </connector>
+        <inputAssignments>
+            <field>Category__c</field>
+            <value>
+                <stringValue>HR Admin</stringValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Due_Date__c</field>
+            <value>
+                <elementReference>$Flow.CurrentDate</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Job_Application__c</field>
+            <value>
+                <elementReference>$Record.Id</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Name</field>
+            <value>
+                <stringValue>Background Check</stringValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Owner_Name__c</field>
+            <value>
+                <stringValue>HR Coordinator</stringValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Status__c</field>
+            <value>
+                <stringValue>Not Started</stringValue>
+            </value>
+        </inputAssignments>
+        <object>Onboarding_Task__c</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordCreates>
+    <recordCreates>
+        <name>Create_Equipment_Task</name>
+        <label>Create Equipment Task</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Create_Welcome_Email_Task</targetReference>
+        </connector>
+        <inputAssignments>
+            <field>Category__c</field>
+            <value>
+                <stringValue>IT Setup</stringValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Due_Date__c</field>
+            <value>
+                <elementReference>$Flow.CurrentDate</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Job_Application__c</field>
+            <value>
+                <elementReference>$Record.Id</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Name</field>
+            <value>
+                <stringValue>Assign Equipment</stringValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Owner_Name__c</field>
+            <value>
+                <stringValue>IT Support</stringValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Status__c</field>
+            <value>
+                <stringValue>Not Started</stringValue>
+            </value>
+        </inputAssignments>
+        <object>Onboarding_Task__c</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordCreates>
+    <recordCreates>
+        <name>Create_Manager_Prep_Task</name>
+        <label>Create Manager Prep Task</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <inputAssignments>
+            <field>Category__c</field>
+            <value>
+                <stringValue>Manager Prep</stringValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Due_Date__c</field>
+            <value>
+                <elementReference>$Flow.CurrentDate</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Job_Application__c</field>
+            <value>
+                <elementReference>$Record.Id</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Name</field>
+            <value>
+                <stringValue>Prepare Manager Checklist</stringValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Owner_Name__c</field>
+            <value>
+                <stringValue>Hiring Manager</stringValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Status__c</field>
+            <value>
+                <stringValue>Not Started</stringValue>
+            </value>
+        </inputAssignments>
+        <object>Onboarding_Task__c</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordCreates>
+    <recordCreates>
+        <name>Create_Offer_Letter_Task</name>
+        <label>Create Offer Letter Task</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Create_Background_Check_Task</targetReference>
+        </connector>
+        <inputAssignments>
+            <field>Category__c</field>
+            <value>
+                <stringValue>HR Admin</stringValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Due_Date__c</field>
+            <value>
+                <elementReference>$Flow.CurrentDate</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Job_Application__c</field>
+            <value>
+                <elementReference>$Record.Id</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Name</field>
+            <value>
+                <stringValue>Send Offer Letter</stringValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Owner_Name__c</field>
+            <value>
+                <stringValue>Recruiter</stringValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Status__c</field>
+            <value>
+                <stringValue>Not Started</stringValue>
+            </value>
+        </inputAssignments>
+        <object>Onboarding_Task__c</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordCreates>
+    <recordCreates>
+        <name>Create_Welcome_Email_Task</name>
+        <label>Create Welcome Email Task</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Create_Manager_Prep_Task</targetReference>
+        </connector>
+        <inputAssignments>
+            <field>Category__c</field>
+            <value>
+                <stringValue>Orientation</stringValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Due_Date__c</field>
+            <value>
+                <elementReference>$Flow.CurrentDate</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Job_Application__c</field>
+            <value>
+                <elementReference>$Record.Id</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Name</field>
+            <value>
+                <stringValue>Send Welcome Email</stringValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Owner_Name__c</field>
+            <value>
+                <stringValue>HR Coordinator</stringValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Status__c</field>
+            <value>
+                <stringValue>Not Started</stringValue>
+            </value>
+        </inputAssignments>
+        <object>Onboarding_Task__c</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordCreates>
+    <start>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Was_Newly_Hired</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>Stage__c</field>
+            <operator>EqualTo</operator>
+            <value>
+                <stringValue>Hired</stringValue>
+            </value>
+        </filters>
+        <object>Job_Application__c</object>
+        <recordTriggerType>CreateAndUpdate</recordTriggerType>
+        <triggerType>RecordAfterSave</triggerType>
+    </start>
+    <status>Active</status>
+</Flow>

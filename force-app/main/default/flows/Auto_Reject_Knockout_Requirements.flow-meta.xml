@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>67.0</apiVersion>
+    <areMetricsLoggedToDataCloud>false</areMetricsLoggedToDataCloud>
+    <assignments>
+        <name>Reject_Certification_Mismatch</name>
+        <label>Reject - Certification Mismatch</label>
+        <locationX>842</locationX>
+        <locationY>782</locationY>
+        <assignmentItems>
+            <assignToReference>$Record.Stage__c</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <stringValue>Rejected</stringValue>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>$Record.Rejection_Reason__c</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <stringValue>Missing required certification</stringValue>
+            </value>
+        </assignmentItems>
+    </assignments>
+    <assignments>
+        <name>Reject_Clearance_Mismatch</name>
+        <label>Reject - Clearance Mismatch</label>
+        <locationX>50</locationX>
+        <locationY>350</locationY>
+        <assignmentItems>
+            <assignToReference>$Record.Stage__c</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <stringValue>Rejected</stringValue>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>$Record.Rejection_Reason__c</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <stringValue>Missing required security clearance</stringValue>
+            </value>
+        </assignmentItems>
+    </assignments>
+    <assignments>
+        <name>Reject_Degree_Mismatch</name>
+        <label>Reject - Degree Mismatch</label>
+        <locationX>578</locationX>
+        <locationY>566</locationY>
+        <assignmentItems>
+            <assignToReference>$Record.Stage__c</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <stringValue>Rejected</stringValue>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>$Record.Rejection_Reason__c</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <stringValue>Missing required degree</stringValue>
+            </value>
+        </assignmentItems>
+    </assignments>
+    <assignments>
+        <name>Reject_Experience_Mismatch</name>
+        <label>Reject - Experience Mismatch</label>
+        <locationX>1106</locationX>
+        <locationY>998</locationY>
+        <assignmentItems>
+            <assignToReference>$Record.Stage__c</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <stringValue>Rejected</stringValue>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>$Record.Rejection_Reason__c</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <stringValue>Does not meet minimum years of experience</stringValue>
+            </value>
+        </assignmentItems>
+    </assignments>
+    <decisions>
+        <name>Check_Certification</name>
+        <label>Check Certification</label>
+        <locationX>578</locationX>
+        <locationY>674</locationY>
+        <defaultConnector>
+            <targetReference>Check_Experience</targetReference>
+        </defaultConnector>
+        <defaultConnectorLabel>Certification OK</defaultConnectorLabel>
+        <rules>
+            <name>Certification_Required_Not_Held</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>Get_Position.Requires_Certification__c</leftValueReference>
+                <operator>EqualTo</operator>
+                <rightValue>
+                    <booleanValue>true</booleanValue>
+                </rightValue>
+            </conditions>
+            <conditions>
+                <leftValueReference>$Record.Has_Required_Certification__c</leftValueReference>
+                <operator>EqualTo</operator>
+                <rightValue>
+                    <booleanValue>false</booleanValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>Reject_Certification_Mismatch</targetReference>
+            </connector>
+            <label>Certification Required, Not Held</label>
+        </rules>
+    </decisions>
+    <decisions>
+        <name>Check_Clearance</name>
+        <label>Check Clearance</label>
+        <locationX>314</locationX>
+        <locationY>242</locationY>
+        <defaultConnector>
+            <targetReference>Check_Degree</targetReference>
+        </defaultConnector>
+        <defaultConnectorLabel>Clearance OK</defaultConnectorLabel>
+        <rules>
+            <name>Clearance_Required_Not_Held</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>Get_Position.Requires_Security_Clearance__c</leftValueReference>
+                <operator>EqualTo</operator>
+                <rightValue>
+                    <booleanValue>true</booleanValue>
+                </rightValue>
+            </conditions>
+            <conditions>
+                <leftValueReference>$Record.Has_Security_Clearance__c</leftValueReference>
+                <operator>EqualTo</operator>
+                <rightValue>
+                    <booleanValue>false</booleanValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>Reject_Clearance_Mismatch</targetReference>
+            </connector>
+            <label>Clearance Required, Not Held</label>
+        </rules>
+    </decisions>
+    <decisions>
+        <name>Check_Degree</name>
+        <label>Check Degree</label>
+        <locationX>314</locationX>
+        <locationY>458</locationY>
+        <defaultConnector>
+            <targetReference>Check_Certification</targetReference>
+        </defaultConnector>
+        <defaultConnectorLabel>Degree OK</defaultConnectorLabel>
+        <rules>
+            <name>Degree_Required_Not_Held</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>Get_Position.Requires_Degree__c</leftValueReference>
+                <operator>EqualTo</operator>
+                <rightValue>
+                    <booleanValue>true</booleanValue>
+                </rightValue>
+            </conditions>
+            <conditions>
+                <leftValueReference>$Record.Has_Required_Degree__c</leftValueReference>
+                <operator>EqualTo</operator>
+                <rightValue>
+                    <booleanValue>false</booleanValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>Reject_Degree_Mismatch</targetReference>
+            </connector>
+            <label>Degree Required, Not Held</label>
+        </rules>
+    </decisions>
+    <decisions>
+        <name>Check_Experience</name>
+        <label>Check Experience</label>
+        <locationX>842</locationX>
+        <locationY>890</locationY>
+        <defaultConnectorLabel>Experience OK</defaultConnectorLabel>
+        <rules>
+            <name>Minimum_Experience_Not_Met</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>Get_Position.Minimum_Years_Experience__c</leftValueReference>
+                <operator>GreaterThan</operator>
+                <rightValue>
+                    <elementReference>$Record.Years_of_Experience__c</elementReference>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>Reject_Experience_Mismatch</targetReference>
+            </connector>
+            <label>Minimum Experience Not Met</label>
+        </rules>
+    </decisions>
+    <environments>Default</environments>
+    <interviewLabel>Auto Reject - Knockout Requirements {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>Auto Reject - Knockout Requirements</label>
+    <processMetadataValues>
+        <name>BuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>CanvasMode</name>
+        <value>
+            <stringValue>AUTO_LAYOUT_CANVAS</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>OriginBuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processType>AutoLaunchedFlow</processType>
+    <recordLookups>
+        <name>Get_Position</name>
+        <label>Get Position</label>
+        <locationX>314</locationX>
+        <locationY>134</locationY>
+        <assignNullValuesIfNoRecordsFound>false</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>Check_Clearance</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>Id</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>$Record.Position__c</elementReference>
+            </value>
+        </filters>
+        <getFirstRecordOnly>true</getFirstRecordOnly>
+        <object>Position__c</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordLookups>
+    <start>
+        <locationX>188</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Get_Position</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>Stage__c</field>
+            <operator>NotEqualTo</operator>
+            <value>
+                <stringValue>Rejected</stringValue>
+            </value>
+        </filters>
+        <object>Job_Application__c</object>
+        <recordTriggerType>CreateAndUpdate</recordTriggerType>
+        <triggerType>RecordBeforeSave</triggerType>
+    </start>
+    <status>Active</status>
+</Flow>

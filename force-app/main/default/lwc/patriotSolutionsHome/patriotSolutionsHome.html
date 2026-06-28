@@ -1,3 +1,294 @@
 <template>
-    
+    <div class="dashboard-shell">
+        <aside class="sidebar">
+            <div class="sidebar-heading">
+                <h2>Recruitment</h2>
+                <p>Management</p>
+            </div>
+
+            <nav class="side-nav" aria-label="Recruitment management">
+                <template for:each={navItems} for:item="item">
+                    <a key={item.label} class={item.className} href={item.href}>
+                        <lightning-icon
+                            class="dashboard-icon"
+                            icon-name={item.iconName}
+                            size="x-small"
+                            alternative-text={item.label}
+                        ></lightning-icon>
+                        <span>{item.label}</span>
+                    </a>
+                </template>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="primary-pill" onclick={handleNewJobOpening}>
+                    <lightning-icon
+                        class="dashboard-icon inverse-icon"
+                        icon-name="utility:add"
+                        size="x-small"
+                        alternative-text="Add"
+                    ></lightning-icon>
+                    New Job Opening
+                </button>
+            </div>
+        </aside>
+
+        <div class="content-region">
+            <main class="main-content">
+                <div class="content-container">
+                    <section class="page-heading">
+                        <div>
+                            <h1>Welcome back, Recruiter</h1>
+                            <p>
+                                Manage hiring, interviews, and onboarding from
+                                one place.
+                            </p>
+                        </div>
+                        <div class="heading-actions">
+                            <button class="secondary-pill">
+                                View Analytics
+                            </button>
+                            <button class="primary-pill">
+                                Download Report
+                            </button>
+                        </div>
+                    </section>
+
+                <section class="kpi-grid" aria-label="Hiring metrics">
+                    <template for:each={kpis} for:item="kpi">
+                        <article class="slds-card kpi-card" key={kpi.label}>
+                            <div class="metric-icon">
+                                <lightning-icon
+                                    class="dashboard-icon"
+                                    icon-name={kpi.iconName}
+                                    size="small"
+                                    alternative-text={kpi.label}
+                                ></lightning-icon>
+                            </div>
+                            <div class="metric-body">
+                                <p>{kpi.label}</p>
+                                <div class="metric-value-row">
+                                    <strong>{kpi.value}</strong>
+                                    <template if:true={kpi.trend}>
+                                        <span class="trend-badge">
+                                            <lightning-icon
+                                                class="dashboard-icon trend-icon"
+                                                icon-name="utility:trending"
+                                                size="xx-small"
+                                                alternative-text="Trending up"
+                                            ></lightning-icon>
+                                            {kpi.trend}
+                                        </span>
+                                    </template>
+                                </div>
+                            </div>
+                        </article>
+                    </template>
+                </section>
+
+                <div class="dashboard-grid">
+                    <div class="primary-column">
+                        <section class="slds-card panel">
+                            <div class="panel-header">
+                                <h2>Candidate Pipeline</h2>
+                                <button class="text-link">
+                                    View Board
+                                    <lightning-icon
+                                        class="dashboard-icon link-icon"
+                                        icon-name="utility:forward"
+                                        size="xx-small"
+                                        alternative-text="View board"
+                                    ></lightning-icon>
+                                </button>
+                            </div>
+
+                            <div class="kanban-scroll">
+                                <div class="kanban-board">
+                                    <template
+                                        for:each={pipelineStages}
+                                        for:item="stage"
+                                    >
+                                        <section
+                                            class="kanban-column"
+                                            key={stage.name}
+                                        >
+                                            <div class="kanban-title">
+                                                <span>{stage.label}</span>
+                                            </div>
+                                            <template
+                                                for:each={stage.candidates}
+                                                for:item="candidate"
+                                            >
+                                                <article
+                                                    class={candidate.cardClass}
+                                                    key={candidate.name}
+                                                >
+                                                    <div class="candidate-top">
+                                                        <strong>
+                                                            {candidate.name}
+                                                        </strong>
+                                                        <template
+                                                            if:true={candidate.status}
+                                                        >
+                                                            <span
+                                                                class={candidate.badgeClass}
+                                                            >
+                                                                {candidate.status}
+                                                            </span>
+                                                        </template>
+                                                    </div>
+                                                    <p>{candidate.role}</p>
+                                                </article>
+                                            </template>
+                                        </section>
+                                    </template>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="slds-card panel table-panel">
+                            <div class="panel-header">
+                                <h2>Upcoming Interviews</h2>
+                                <button class="icon-button" aria-label="More">
+                                    <lightning-icon
+                                        class="dashboard-icon"
+                                        icon-name="utility:threedots_vertical"
+                                        size="x-small"
+                                        alternative-text="More"
+                                    ></lightning-icon>
+                                </button>
+                            </div>
+
+                            <div class="table-scroll">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Candidate</th>
+                                            <th>Position</th>
+                                            <th>Date &amp; Time</th>
+                                            <th>Interviewer</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template
+                                            for:each={interviews}
+                                            for:item="interview"
+                                        >
+                                            <tr key={interview.id}>
+                                                <td class="candidate-name">
+                                                    {interview.candidate}
+                                                </td>
+                                                <td>{interview.position}</td>
+                                                <td>{interview.date}</td>
+                                                <td>{interview.interviewer}</td>
+                                                <td>
+                                                    <span
+                                                        class={interview.statusClass}
+                                                    >
+                                                        {interview.status}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </div>
+
+                    <aside class="secondary-column">
+                        <section class="slds-card action-panel">
+                            <h2>Quick Actions</h2>
+                            <div class="quick-actions">
+                                <template
+                                    for:each={quickActions}
+                                    for:item="action"
+                                >
+                                    <button
+                                        class="quick-action"
+                                        data-object-api-name={action.objectApiName}
+                                        key={action.label}
+                                        onclick={handleQuickAction}
+                                    >
+                                        <lightning-icon
+                                            class="dashboard-icon"
+                                            icon-name={action.iconName}
+                                            size="small"
+                                            alternative-text={action.label}
+                                        ></lightning-icon>
+                                        {action.label}
+                                    </button>
+                                </template>
+                            </div>
+                        </section>
+
+                        <section class="slds-card onboarding-panel">
+                            <h2>Onboarding Progress</h2>
+                            <div class="progress-summary">
+                                <span>Global Tasks</span>
+                                <strong>65%</strong>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill"></div>
+                            </div>
+
+                            <ul class="checklist">
+                                <template
+                                    for:each={onboardingTasks}
+                                    for:item="task"
+                                >
+                                    <li class={task.className} key={task.label}>
+                                        <lightning-icon
+                                            class="dashboard-icon"
+                                            icon-name={task.iconName}
+                                            size="x-small"
+                                            alternative-text={task.label}
+                                        ></lightning-icon>
+                                        <span>{task.label}</span>
+                                    </li>
+                                </template>
+                            </ul>
+                        </section>
+
+                        <section class="slds-card activity-panel">
+                            <div class="panel-header">
+                                <h2>Recent Activity</h2>
+                            </div>
+                            <div class="activity-list">
+                                <template
+                                    for:each={recentActivity}
+                                    for:item="activity"
+                                >
+                                    <article
+                                        class={activity.className}
+                                        key={activity.message}
+                                    >
+                                        <span class={activity.dotClass}></span>
+                                        <div>
+                                            <p>{activity.message}</p>
+                                            <small>{activity.time}</small>
+                                        </div>
+                                    </article>
+                                </template>
+                                <button class="text-link full-width">
+                                    View all activity
+                                </button>
+                            </div>
+                        </section>
+                    </aside>
+                </div>
+                </div>
+            </main>
+
+            <footer class="footer">
+                <span>© 2024 Patriot Solutions. Version 4.2.1-stable</span>
+                <nav aria-label="Footer">
+                    <a href="#">Privacy Policy</a>
+                    <a href="#">Terms of Service</a>
+                    <a href="#">Support</a>
+                </nav>
+            </footer>
+        </div>
+    </div>
 </template>
