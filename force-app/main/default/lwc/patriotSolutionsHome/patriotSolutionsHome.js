@@ -19,6 +19,53 @@ const PIPELINE_CARD_CLASSES = [
 
 const PIPELINE_BADGE_CLASSES = ["badge gray", "badge blue", "badge green"];
 
+const A11Y_STORAGE_KEY = "patriot_a11y_v1";
+
+const DEFAULT_A11Y_PREFERENCES = {
+  fontScale: 100,
+  lineHeight: "default",
+  letterSpacing: "default",
+  fontFamily: "default",
+  boldText: false,
+  highContrast: false,
+  theme: "light",
+  colorVision: "none",
+  reduceTransparency: false,
+  reduceMotion: false,
+  disableCardLift: false,
+  syncOsMotion: true,
+  enhancedFocus: false,
+  alwaysShowFocus: false,
+  focusRingColor: "primary",
+  skipLink: true,
+  announceViewChanges: true,
+  verboseAnnouncements: false,
+  announceLoading: true,
+  hideDecorativeIcons: false,
+  tableSummaries: false,
+  largeTouchTargets: false,
+  alwaysShowHints: false,
+  extendedClickAreas: false,
+  underlineLinks: false,
+  simplifiedLayout: false,
+  tableDensity: "comfortable",
+  pipelineListView: false,
+  stickySidebarLabels: false,
+  reduceClutter: false,
+  syncOsPreferences: true
+};
+
+const NAV_VIEW_IDS = [
+  "dashboard",
+  "jobOpenings",
+  "candidates",
+  "interviews",
+  "hiringPipeline",
+  "onboarding",
+  "reports",
+  "settings"
+];
+
 export default class PatriotSolutionsHome extends NavigationMixin(
   LightningElement
 ) {
@@ -41,55 +88,70 @@ export default class PatriotSolutionsHome extends NavigationMixin(
   onboardingTasks = [];
   onboardingProgress = 0;
   onboardingError;
+  accessibilityPreferences = { ...DEFAULT_A11Y_PREFERENCES };
+  liveRegionMessage = "";
+  showShortcutsPanel = false;
+  _keyboardHandler;
+  _motionMediaQuery;
+  _contrastMediaQuery;
+  _colorSchemeMediaQuery;
 
   navItems = [
     {
       label: "Dashboard",
       iconName: "utility:apps",
       viewId: "dashboard",
-      className: "active"
+      className: "active",
+      ariaCurrent: "page"
     },
     {
       label: "Job Openings",
       iconName: "standard:job_position",
       viewId: "jobOpenings",
-      className: ""
+      className: "",
+      ariaCurrent: null
     },
     {
       label: "Candidates",
       iconName: "standard:people",
       viewId: "candidates",
-      className: ""
+      className: "",
+      ariaCurrent: null
     },
     {
       label: "Interviews",
       iconName: "standard:event",
       viewId: "interviews",
-      className: ""
+      className: "",
+      ariaCurrent: null
     },
     {
       label: "Hiring Pipeline",
       iconName: "standard:hierarchy",
       viewId: "hiringPipeline",
-      className: ""
+      className: "",
+      ariaCurrent: null
     },
     {
       label: "Onboarding",
       iconName: "standard:employee",
       viewId: "onboarding",
-      className: ""
+      className: "",
+      ariaCurrent: null
     },
     {
       label: "Reports",
       iconName: "standard:report",
       viewId: "reports",
-      className: ""
+      className: "",
+      ariaCurrent: null
     },
     {
       label: "Settings",
       iconName: "utility:settings",
       viewId: "settings",
-      className: ""
+      className: "",
+      ariaCurrent: null
     }
   ];
 
@@ -116,9 +178,15 @@ export default class PatriotSolutionsHome extends NavigationMixin(
     if (data) {
       this.stats = data;
       this.statsError = undefined;
+      if (this.accessibilityPreferences.announceLoading) {
+        this.announceLiveMessage("Dashboard metrics loaded.");
+      }
     } else if (error) {
       this.statsError = error;
       this.stats = undefined;
+      if (this.accessibilityPreferences.announceLoading) {
+        this.announceLiveMessage("Unable to load dashboard metrics.");
+      }
     }
   }
 
@@ -262,7 +330,7 @@ export default class PatriotSolutionsHome extends NavigationMixin(
   }
 
   get isLoading() {
-    return !this.stats && !this.statsError;
+    return this.isDashboardView && !this.stats && !this.statsError;
   }
 
   get hasLoadError() {
@@ -438,6 +506,457 @@ export default class PatriotSolutionsHome extends NavigationMixin(
     return `${this.onboardingProgress}%`;
   }
 
+  connectedCallback() {
+    this.loadAccessibilityPreferences();
+    this.applyAccessibilityPreferences();
+    this.setupOsPreferenceListeners();
+    this._keyboardHandler = this.handleKeyboardShortcuts.bind(this);
+    window.addEventListener("keydown", this._keyboardHandler);
+  }
+
+  disconnectedCallback() {
+    window.removeEventListener("keydown", this._keyboardHandler);
+    this.teardownOsPreferenceListeners();
+  }
+
+  renderedCallback() {
+    if (!this._a11yApplied) {
+      this.applyAccessibilityPreferences();
+      this._a11yApplied = true;
+    }
+  }
+
+  loadAccessibilityPreferences() {
+    try {
+      window.localStorage.removeItem(A11Y_STORAGE_KEY);
+    } catch {
+      /* localStorage may be unavailable */
+    }
+
+    this.accessibilityPreferences = { ...DEFAULT_A11Y_PREFERENCES };
+  }
+
+  saveAccessibilityPreferences() {
+    try {
+      window.localStorage.setItem(
+        A11Y_STORAGE_KEY,
+        JSON.stringify(this.accessibilityPreferences)
+      );
+    } catch {
+      /* localStorage may be unavailable */
+    }
+  }
+
+  applyOsPreferences() {
+    if (!window.matchMedia) {
+      return;
+    }
+
+    const prefs = { ...this.accessibilityPreferences };
+
+    if (
+      prefs.syncOsMotion &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      prefs.reduceMotion = true;
+    }
+
+    if (window.matchMedia("(prefers-contrast: more)").matches) {
+      prefs.highContrast = true;
+    }
+
+    if (
+      prefs.theme === "system" ||
+      window.matchMedia("(prefers-color-scheme: dark)").matches
+    ) {
+      if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+        prefs.theme = prefs.theme === "light" ? "system" : prefs.theme;
+      }
+    }
+
+    this.accessibilityPreferences = prefs;
+  }
+
+  setupOsPreferenceListeners() {
+    if (!window.matchMedia) {
+      return;
+    }
+
+    this._motionMediaQuery = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    );
+    this._contrastMediaQuery = window.matchMedia("(prefers-contrast: more)");
+    this._colorSchemeMediaQuery = window.matchMedia(
+      "(prefers-color-scheme: dark)"
+    );
+
+    this._handleOsPreferenceChange = () => {
+      if (this.accessibilityPreferences.syncOsPreferences) {
+        this.applyOsPreferences();
+        this.applyAccessibilityPreferences();
+        this.saveAccessibilityPreferences();
+      }
+    };
+
+    this._motionMediaQuery.addEventListener(
+      "change",
+      this._handleOsPreferenceChange
+    );
+    this._contrastMediaQuery.addEventListener(
+      "change",
+      this._handleOsPreferenceChange
+    );
+    this._colorSchemeMediaQuery.addEventListener(
+      "change",
+      this._handleOsPreferenceChange
+    );
+  }
+
+  teardownOsPreferenceListeners() {
+    if (!this._handleOsPreferenceChange) {
+      return;
+    }
+
+    this._motionMediaQuery?.removeEventListener(
+      "change",
+      this._handleOsPreferenceChange
+    );
+    this._contrastMediaQuery?.removeEventListener(
+      "change",
+      this._handleOsPreferenceChange
+    );
+    this._colorSchemeMediaQuery?.removeEventListener(
+      "change",
+      this._handleOsPreferenceChange
+    );
+  }
+
+  applyAccessibilityPreferences() {
+    const host = this.template?.host;
+    if (!host) {
+      return;
+    }
+
+    const prefs = this.accessibilityPreferences;
+    const resolvedTheme = prefs.highContrast
+      ? "high-contrast"
+      : prefs.theme === "system"
+        ? "system"
+        : prefs.theme;
+
+    host.setAttribute("data-theme", resolvedTheme);
+    host.style.setProperty("--font-scale", String(prefs.fontScale / 100));
+    host.setAttribute("data-font-scale", String(prefs.fontScale));
+    host.setAttribute("data-reduce-motion", String(prefs.reduceMotion));
+    host.setAttribute("data-disable-card-lift", String(prefs.disableCardLift));
+    host.setAttribute("data-enhanced-focus", String(prefs.enhancedFocus));
+    host.setAttribute("data-always-show-focus", String(prefs.alwaysShowFocus));
+    host.setAttribute("data-focus-ring-color", prefs.focusRingColor);
+    host.setAttribute("data-bold-text", String(prefs.boldText));
+    host.setAttribute("data-high-contrast", String(prefs.highContrast));
+    host.setAttribute("data-color-vision", prefs.colorVision);
+    host.setAttribute(
+      "data-reduce-transparency",
+      String(prefs.reduceTransparency)
+    );
+    host.setAttribute(
+      "data-large-touch-targets",
+      String(prefs.largeTouchTargets)
+    );
+    host.setAttribute("data-always-show-hints", String(prefs.alwaysShowHints));
+    host.setAttribute(
+      "data-extended-click-areas",
+      String(prefs.extendedClickAreas)
+    );
+    host.setAttribute("data-underline-links", String(prefs.underlineLinks));
+    host.setAttribute("data-simplified-layout", String(prefs.simplifiedLayout));
+    host.setAttribute("data-table-density", prefs.tableDensity);
+    host.setAttribute(
+      "data-pipeline-list-view",
+      String(prefs.pipelineListView)
+    );
+    host.setAttribute(
+      "data-sticky-sidebar-labels",
+      String(prefs.stickySidebarLabels)
+    );
+    host.setAttribute("data-reduce-clutter", String(prefs.reduceClutter));
+    host.setAttribute(
+      "data-hide-decorative-icons",
+      String(prefs.hideDecorativeIcons)
+    );
+    host.setAttribute("data-line-height", prefs.lineHeight);
+    host.setAttribute("data-letter-spacing", prefs.letterSpacing);
+    host.setAttribute("data-font-family", prefs.fontFamily);
+  }
+
+  handlePreferenceChange(event) {
+    const prefKey = event.currentTarget.dataset.pref;
+    if (!prefKey) {
+      return;
+    }
+
+    let value;
+    if (event.detail && event.detail.checked !== undefined) {
+      value = event.detail.checked;
+    } else if (event.detail && event.detail.value !== undefined) {
+      value = event.detail.value;
+    } else if (event.target.type === "checkbox") {
+      value = event.target.checked;
+    } else {
+      value = event.target.value;
+    }
+
+    if (prefKey === "fontScale") {
+      value = Number(value);
+    }
+
+    this.accessibilityPreferences = {
+      ...this.accessibilityPreferences,
+      [prefKey]: value
+    };
+
+    this.applyAccessibilityPreferences();
+    this.saveAccessibilityPreferences();
+    this.announceLiveMessage("Accessibility preference updated.");
+  }
+
+  handleFontScalePreset(event) {
+    const scale = Number(event.currentTarget.dataset.scale);
+    this.accessibilityPreferences = {
+      ...this.accessibilityPreferences,
+      fontScale: scale
+    };
+    this.applyAccessibilityPreferences();
+    this.saveAccessibilityPreferences();
+  }
+
+  handleResetAccessibility() {
+    this.accessibilityPreferences = { ...DEFAULT_A11Y_PREFERENCES };
+    try {
+      window.localStorage.removeItem(A11Y_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+    this.applyAccessibilityPreferences();
+    this.announceLiveMessage("Accessibility settings reset to defaults.");
+  }
+
+  handleOpenShortcutsPanel() {
+    this.showShortcutsPanel = true;
+  }
+
+  handleCloseShortcutsPanel() {
+    this.showShortcutsPanel = false;
+  }
+
+  handleSkipToMain(event) {
+    event.preventDefault();
+    const main = this.template.querySelector(".main-content");
+    main?.focus();
+  }
+
+  handleKeyboardShortcuts(event) {
+    const target = event.target;
+    const tagName = target.tagName?.toLowerCase();
+    const isEditable =
+      tagName === "input" ||
+      tagName === "textarea" ||
+      tagName === "select" ||
+      target.isContentEditable;
+
+    if (event.key === "Escape" && this.showShortcutsPanel) {
+      this.showShortcutsPanel = false;
+      return;
+    }
+
+    if (event.key === "?" && !isEditable && !event.shiftKey) {
+      event.preventDefault();
+      this.showShortcutsPanel = true;
+      return;
+    }
+
+    if (isEditable) {
+      return;
+    }
+
+    if (event.key === "/" && this.activeView === "candidates") {
+      event.preventDefault();
+      const search = this.template.querySelector(
+        'lightning-input[data-id="candidate-search"]'
+      );
+      search?.focus();
+      return;
+    }
+
+    const digit = Number(event.key);
+    if (digit >= 1 && digit <= 8 && !event.ctrlKey && !event.metaKey) {
+      const viewId = NAV_VIEW_IDS[digit - 1];
+      if (viewId) {
+        event.preventDefault();
+        this.setActiveView(viewId);
+      }
+    }
+  }
+
+  announceLiveMessage(message) {
+    this.liveRegionMessage = "";
+    // eslint-disable-next-line @lwc/lwc/no-async-operation
+    requestAnimationFrame(() => {
+      this.liveRegionMessage = message;
+    });
+  }
+
+  announceViewChange(viewId) {
+    if (!this.accessibilityPreferences.announceViewChanges) {
+      return;
+    }
+
+    const activeItem = this.navItems.find((item) => item.viewId === viewId);
+    const label = activeItem?.label || viewId;
+    let message = `Now viewing: ${label}.`;
+
+    if (this.accessibilityPreferences.verboseAnnouncements) {
+      const counts = {
+        candidates: this.candidates.length,
+        interviews: this.allInterviews.length,
+        jobOpenings: this.jobOpenings.length
+      };
+      const count = counts[viewId];
+      if (count !== undefined) {
+        message = `${label}, ${count} records loaded.`;
+      }
+    }
+
+    this.announceLiveMessage(message);
+  }
+
+  get showSkipLink() {
+    return this.accessibilityPreferences.skipLink;
+  }
+
+  get decorativeIconClass() {
+    return this.accessibilityPreferences.hideDecorativeIcons
+      ? "dashboard-icon decorative-icon"
+      : "dashboard-icon";
+  }
+
+  get accessibilityPreviewBadge() {
+    const prefs = this.accessibilityPreferences;
+    const badges = [];
+
+    if (prefs.highContrast) {
+      badges.push("High Contrast");
+    }
+    if (prefs.theme === "dark" || prefs.theme === "system") {
+      badges.push(prefs.theme === "dark" ? "Dark" : "System Theme");
+    }
+    if (prefs.fontScale !== 100) {
+      badges.push(`${prefs.fontScale}% Text`);
+    }
+    if (prefs.reduceMotion) {
+      badges.push("Reduced Motion");
+    }
+    if (prefs.largeTouchTargets) {
+      badges.push("Large Targets");
+    }
+    if (prefs.pipelineListView) {
+      badges.push("List View");
+    }
+
+    return badges.length ? badges.join(" · ") : "Default profile";
+  }
+
+  get usePipelineListView() {
+    return this.accessibilityPreferences.pipelineListView;
+  }
+
+  get pipelineListStages() {
+    return this.pipelineStages.map((stage) => ({
+      ...stage,
+      listCandidates: stage.candidates.map((candidate) => ({
+        ...candidate,
+        listLabel: `${candidate.name} — ${candidate.role} (${stage.label})`
+      }))
+    }));
+  }
+
+  get interviewsTableDescribedBy() {
+    if (!this.accessibilityPreferences.tableSummaries) {
+      return undefined;
+    }
+
+    return this.activeView === "interviews"
+      ? "all-interviews-summary"
+      : "dashboard-interviews-summary";
+  }
+
+  get lineHeightOptions() {
+    return [
+      { label: "Default", value: "default" },
+      { label: "Relaxed", value: "relaxed" },
+      { label: "Spacious", value: "spacious" }
+    ];
+  }
+
+  get letterSpacingOptions() {
+    return [
+      { label: "Default", value: "default" },
+      { label: "Wide", value: "wide" },
+      { label: "Extra wide", value: "extra-wide" }
+    ];
+  }
+
+  get fontFamilyOptions() {
+    return [
+      { label: "Default (IBM Plex Sans)", value: "default" },
+      { label: "System UI", value: "system" },
+      { label: "Dyslexia-friendly", value: "dyslexia" }
+    ];
+  }
+
+  get themeOptions() {
+    return [
+      { label: "Light", value: "light" },
+      { label: "Dark", value: "dark" },
+      { label: "Match system", value: "system" }
+    ];
+  }
+
+  get colorVisionOptions() {
+    return [
+      { label: "None", value: "none" },
+      { label: "Protanopia", value: "protanopia" },
+      { label: "Deuteranopia", value: "deuteranopia" },
+      { label: "Tritanopia", value: "tritanopia" }
+    ];
+  }
+
+  get focusRingColorOptions() {
+    return [
+      { label: "Primary", value: "primary" },
+      { label: "Yellow", value: "yellow" },
+      { label: "White", value: "white" }
+    ];
+  }
+
+  get tableDensityOptions() {
+    return [
+      { label: "Comfortable", value: "comfortable" },
+      { label: "Compact", value: "compact" }
+    ];
+  }
+
+  get a11y() {
+    return this.accessibilityPreferences;
+  }
+
+  handleInterviewKeydown(event) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      this.handleInterviewClick(event);
+    }
+  }
+
   handleNavClick(event) {
     const viewId = event.currentTarget.dataset.view;
 
@@ -447,14 +966,29 @@ export default class PatriotSolutionsHome extends NavigationMixin(
   }
 
   setActiveView(viewId) {
+    const viewChanged = this.activeView !== viewId;
     this.activeView = viewId;
     this.updateNavActiveState(viewId);
+    this.announceViewChange(viewId);
+
+    if (viewChanged) {
+      // eslint-disable-next-line @lwc/lwc/no-async-operation
+      requestAnimationFrame(() => this.scrollMainContentToTop());
+    }
+  }
+
+  scrollMainContentToTop() {
+    const main = this.template.querySelector(".main-content");
+    if (main) {
+      main.scrollTop = 0;
+    }
   }
 
   updateNavActiveState(viewId) {
     this.navItems = this.navItems.map((item) => ({
       ...item,
-      className: item.viewId === viewId ? "active" : ""
+      className: item.viewId === viewId ? "active" : "",
+      ariaCurrent: item.viewId === viewId ? "page" : null
     }));
   }
 
@@ -475,7 +1009,7 @@ export default class PatriotSolutionsHome extends NavigationMixin(
   }
 
   handleDownloadReport() {
-    this.navigateToObjectHome("Report");
+    this.setActiveView("reports");
   }
 
   handleViewBoard() {
